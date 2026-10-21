@@ -1,0 +1,15 @@
+services:
+  hamrah:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3001"
+    env_file: .env
+    environment:
+      HOST: 0.0.0.0
+      DATA_DIR: /app/data
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:?Set a random password with at least 20 characters in .env}
+    volumes:
+      - hamrah-data:/app/data
+volumes:
+  hamrah-data:

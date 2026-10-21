@@ -1,0 +1,131 @@
+import { config } from "./config.ts";
+import { redact } from "./security.ts";
+import type { Service, Backup, Release } from "../src/types.ts";
+const safe = (s: string) => encodeURIComponent(s);
+export class Liara {
+  constructor(
+    private token = config.liaraToken,
+    private request: typeof fetch = fetch,
+  ) {}
+  async call(endpoint: string, method = "GET", body?: unknown) {
+    if (!this.token) throw new Error("کلید API لیارا در .env تنظیم نشده است.");
+    const response = await this.request(`https://api.liara.ir${endpoint}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${this.token}`,
+        ...(body instanceof FormData
+          ? {}
+          : { "Content-Type": "application/json" }),
+        ...(config.teamId ? { "x-team-id": config.teamId } : {}),
+      },
+      body:
+        body instanceof FormData
+          ? body
+          : body === undefined
+            ? undefined
+            : JSON.stringify(body),
+      signal: AbortSignal.timeout(20000),
+      redirect: "error",
+    });
+    if (!response.ok)
+      throw new Error(
+        `Liara HTTP ${response.status}: ${redact(await response.text()).slice(0, 600)}`,
+      );
+    const text = await response.text();
+    return text ? JSON.parse(text) : {};
+  }
+  async apps(): Promise<Service[]> {
+    const data = await this.call("/v1/projects");
+    if (!Array.isArray(data.projects))
+      throw new Error(
+        "پاسخ فهرست برنامه‌های لیارا با قالب مورد انتظار هم‌خوانی ندارد.",
+      );
+    return data.projects.map((p: Record<string, unknown>) => ({
+      id: String(p.project_id || p._id),
+      name: String(p.project_id || p._id),
+      platform: String(p.type || "app"),
+      type: "app",
+      status: p.scale === 0 ? "down" : "unknown",
+      detail: p.scale === 0 ? "سرویس خاموش است" : "منتظر بررسی سلامت",
+      plan: String(p.planID || "—"),
+    }));
+  }
+  async logs(app: string) {
+    return {
+      source: "Liara logs API",
+      text: redact(
+        await this.call(
+          `/v1/projects/${safe(app)}/logs?since=${encodeURIComponent(new Date(Date.now() - 1800000).toISOString())}`,
+        ),
+      ),
+    };
+  }
+  async metrics(app: string) {
+    return this.call(`/v1/projects/${safe(app)}/metrics/summary`);
+  }
+  async restart(app: string) {
+    this.assertWritable(app);
+    return this.call(`/v1/projects/${safe(app)}/actions/restart`, "POST");
+  }
+  async backups(): Promise<Backup[]> {
+    if (!config.databaseId) return [];
+    const data = await this.call(
+      `/v1/databases/${safe(config.databaseId)}/backups`,
+    );
+    return (data.backups || []).map((b: Record<string, unknown>) => ({
+      id: String(b.name),
+      name: String(b.name),
+      at: String(b.lastModified),
+      size: `${(Number(b.size) / 1024 / 1024).toFixed(1)} MB`,
+      status: "ready",
+      source: "live",
+    }));
+  }
+  async createBackup(app: string) {
+    this.assertWritable(app);
+    if (!config.databaseId)
+      throw new Error("LIARA_DATABASE_ID تنظیم نشده است.");
+    return this.call(
+      `/v1/databases/${safe(config.databaseId)}/backups`,
+      "POST",
+    );
+  }
+  async releases(app: string): Promise<Release[]> {
+    const data = await this.call(
+      `/v1/projects/${safe(app)}/releases?page=1&count=20`,
+    );
+    return (data.releases || []).map(
+      (r: Record<string, unknown>, i: number) => ({
+        id: String(r._id),
+        version: String(r.tag || `release-${i + 1}`),
+        title: String(
+          (r.gitInfo as Record<string, unknown> | undefined)?.message ||
+            "انتشار لیارا",
+        ),
+        at: String(r.created_at || ""),
+        status: String(r.state || "unknown"),
+        source: "live",
+      }),
+    );
+  }
+  async deploy(app: string, archive: Buffer) {
+    this.assertWritable(app);
+    const form = new FormData();
+    form.append("file", new Blob([new Uint8Array(archive)]), "golbazar.tar.gz");
+    const source = await this.call(
+      `/v2/projects/${safe(app)}/sources`,
+      "POST",
+      form,
+    );
+    if (!source.sourceID) throw new Error("لیارا شناسهٔ سورس را برنگرداند.");
+    return this.call(`/v2/projects/${safe(app)}/releases`, "POST", {
+      sourceID: source.sourceID,
+      port: 3000,
+      type: "docker",
+    });
+  }
+  assertWritable(app: string) {
+    if (!config.allowedApps.includes(app))
+      throw new Error("این برنامه در LIARA_ALLOWED_APP_IDS مجوز تغییر ندارد.");
+  }
+}
