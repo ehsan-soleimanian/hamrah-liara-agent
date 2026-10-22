@@ -48,3 +48,12 @@
 - بررسی موبایل با viewport مرورگر انجام شده، نه دستگاه فیزیکی.
 - ادعای انطباق کامل WCAG یا ممیزی امنیت مستقل وجود ندارد.
 - ویدئوی خروجی، مرور تصویری بی‌صدا از تصاویر واقعی همین اجرای محلی است.
+
+
+### Cleanup recheck — 2026-10-22 14:30–14:31 UTC
+
+- Re-read personal account and Liara team inventories: zero apps, zero databases in both scopes.
+- Both test networks have projectCount=0 and databaseCount=0. Guarded DELETE /v1/networks/{id} returned HTTP 404 in both scopes; subsequent GET confirms they remain. No supported network deletion capability was found in official docs, CLI or the public console bundle.
+- Team balance remains 1,998,854.2 Toman, unchanged since 13:55:48 UTC (about 35 minutes). This is an observation, not a final billing settlement or a guarantee about network pricing.
+- No storage, email, Redis or VM service was created during the test. Unrelated teams were not modified.
+- Sanitized inventory and deletion receipts are included in docs/reports/live-test/evidence.json under cleanupRecheck.
