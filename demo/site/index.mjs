@@ -1,3 +1,4 @@
+import { recovery } from "./recovery.mjs";
 import http from "node:http";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import pg from "pg";
@@ -17,7 +18,8 @@ pool.on("error", () => log("error", "database_pool_error"));
 const page = readFileSync(new URL("./store.html", import.meta.url));
 let faultUntil = 0;
 const startedAt = new Date().toISOString();
-const secret = process.env.TEST_CONTROL_TOKEN || "";
+const secret =
+  process.env.HAMRAH_CONTROL_TOKEN || process.env.TEST_CONTROL_TOKEN || "";
 function authorized(req) {
   const a = Buffer.from(req.headers.authorization || ""),
     b = Buffer.from(`Bearer ${secret}`);
@@ -32,7 +34,7 @@ async function body(req) {
     chunks = [];
   for await (const chunk of req) {
     bytes += chunk.length;
-    if (bytes > 4096) throw new Error("body_limit");
+    if (bytes > 4_000_000) throw new Error("body_limit");
     chunks.push(chunk);
   }
   return JSON.parse(Buffer.concat(chunks).toString() || "{}");
@@ -117,6 +119,20 @@ const server = http.createServer(async (req, res) => {
         json(res, 401, { error: "unauthorized" });
         return;
       }
+      const operation = req.url.slice("/control/".length);
+      if (
+        (req.method === "GET" && operation === "backup") ||
+        (req.method === "POST" &&
+          ["restore-preview", "restore"].includes(operation))
+      ) {
+        const result = await recovery(
+          pool,
+          operation,
+          req.method === "POST" ? await body(req) : {},
+        );
+        json(res, 200, result);
+        return;
+      }
       if (req.method === "POST" && req.url === "/control/fault") {
         const data = await body(req);
         faultUntil =
@@ -155,7 +171,13 @@ const server = http.createServer(async (req, res) => {
         ? "controlled_test_fault"
         : "request_failed",
     );
-    json(res, 503, { ok: false, error: "service_temporarily_unavailable" });
+    json(res, error.status === 409 ? 409 : 503, {
+      ok: false,
+      error:
+        error.status === 409
+          ? "orders_changed"
+          : "service_temporarily_unavailable",
+    });
   }
 });
 server.requestTimeout = 10000;

@@ -388,6 +388,16 @@ app.post(
     res.json({ ok: true });
   },
 );
+app.post("/api/backups/:id/preview", async (req, res) => {
+  res.json(await engine.prepareRestore(req.params.id));
+});
+app.post("/api/care/protection", (req, res) => {
+  const input = z
+    .object({ enabled: z.boolean(), confirm: z.boolean() })
+    .strict()
+    .parse(req.body);
+  res.json(engine.setProtection(input.enabled, input.confirm));
+});
 app.post("/api/actions", async (req, res) => {
   res.json(engine.propose(req.body));
 });
@@ -402,7 +412,7 @@ app.post("/api/actions/:id/decision", async (req, res) => {
 });
 app.post("/api/demo/fault", async (req, res) => {
   const { kind } = z
-    .object({ kind: z.enum(["pool", "persistent", "none"]) })
+    .object({ kind: z.enum(["pool", "persistent", "checkout", "none"]) })
     .strict()
     .parse(req.body);
   await engine.demoFault(kind);

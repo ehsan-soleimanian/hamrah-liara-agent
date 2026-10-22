@@ -1,3 +1,4 @@
+import { Recovery } from "./recovery.ts";
 import { Domains } from "./domains.ts";
 import { Vault } from "./vault.ts";
 import { randomUUID } from "node:crypto";
@@ -7,7 +8,7 @@ import * as tar from "tar";
 import { z } from "zod";
 import { config } from "./config.ts";
 import { Store } from "./store.ts";
-import { Liara } from "./liara.ts";
+import { Liara, LiaraError } from "./liara.ts";
 import { CursorBrain } from "./cursor.ts";
 import { digest, redact } from "./security.ts";
 import { transition } from "./machine.ts";
@@ -25,10 +26,20 @@ import type {
   Snapshot,
   Backup,
   Release,
+  RestorePreview,
+  CareState,
 } from "../src/types.ts";
 const now = () => new Date().toISOString();
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
-const sourceFiles = ["Dockerfile", "package.json", "index.mjs", "liara.json"];
+const sourceFiles = [
+  "Dockerfile",
+  "package.json",
+  "package-lock.json",
+  "index.mjs",
+  "liara.json",
+  "store.html",
+  "recovery.mjs",
+];
 const sourceHash = () =>
   digest(
     sourceFiles.map((file) => [
@@ -55,6 +66,7 @@ const actionSchema = z
   .strict();
 export class Engine {
   liara = new Liara();
+  recovery: Recovery;
   domains: Domains;
   brain: CursorBrain;
   services: Service[] = [];
@@ -68,6 +80,9 @@ export class Engine {
   lastCheck?: string;
   failures = 0;
   constructor(public db: Store) {
+    this.recovery = new Recovery(db, (endpoint, body) =>
+      this.control(endpoint, body),
+    );
     this.domains = new Domains(db, new Vault(config.dataDir));
     this.brain = new CursorBrain(db, {
       get_domains: {
@@ -320,7 +335,12 @@ export class Engine {
       signal: AbortSignal.timeout(6000),
       redirect: "error",
     });
-    if (!r.ok) throw new Error(`فروشگاه آزمایشی پاسخ نداد (${r.status}).`);
+    if (!r.ok)
+      throw new Error(
+        r.status === 409
+          ? "سفارش‌ها تغییر کرده‌اند؛ پیش‌نمایش تازه بگیرید."
+          : `فروشگاه آزمایشی پاسخ نداد (${r.status}).`,
+      );
     return r.json();
   }
   async loadServices() {
@@ -403,6 +423,8 @@ export class Engine {
           try {
             const items = await read();
             this.db.set(`${collection}Cache`, items);
+            if (collection === "backups")
+              this.db.set(`backupsCache:${this.recovery.scope()}`, items);
           } catch (error) {
             this.notices.push(
               `${collection}: ${redact((error as Error).message)}`,
@@ -427,6 +449,7 @@ export class Engine {
       config.mode === "demo"
         ? `${config.demoUrl}/api/checkout/check`
         : config.businessUrl;
+    const scope = this.recovery.scope();
     const start = performance.now();
     let statusCode = 0;
     let healthOk = false,
@@ -465,6 +488,7 @@ export class Engine {
     return {
       id: randomUUID(),
       at: now(),
+      scope,
       healthy: healthOk && businessOk,
       healthOk,
       businessOk,
@@ -664,8 +688,14 @@ export class Engine {
       this.emit();
       if (config.mode === "demo") {
         await wait(900);
-        const exhausted = redact(logs).includes("connection pool exhausted");
-        if (!exhausted) {
+        const entries: { message: string }[] = logs.logs || [];
+        const start = entries.findLastIndex((entry) =>
+          entry.message.startsWith("Demo fault switched to"),
+        );
+        const recent = redact(entries.slice(Math.max(0, start)));
+        const exhausted = recent.includes("connection pool exhausted");
+        const checkoutStalled = recent.includes("CheckoutWorkerStalled");
+        if (!exhausted && !checkoutStalled) {
           this.move(
             id,
             "ESCALATED",
@@ -676,8 +706,9 @@ export class Engine {
         const updated = this.db.get<Incident>("incidents", id)!;
         this.db.put("incidents", {
           ...updated,
-          diagnosis:
-            "اتصال‌های دیتابیس مشغول مانده‌اند و فروشگاه نمی‌تواند سفارش جدید بگیرد. راه‌اندازی مجدد می‌تواند اتصال‌های موقت را آزاد کند؛ سپس ثبت سفارش را دوباره آزمایش می‌کنم.",
+          diagnosis: checkoutStalled
+            ? "سایت باز است، اما پردازشگر موقت ثبت سفارش متوقف شده؛ این نشانه در لاگ دیده شد. راه‌اندازی مجدد می‌تواند پردازشگر را بازنشانی کند؛ سپس ثبت سفارش را آزمایش می‌کنم."
+            : "اتصال‌های دیتابیس مشغول مانده‌اند و فروشگاه نمی‌تواند سفارش جدید بگیرد. راه‌اندازی مجدد می‌تواند اتصال‌های موقت را آزاد کند؛ سپس ثبت سفارش را دوباره آزمایش می‌کنم.",
           confidence: "شواهد مستقیم از لاگ",
         });
         this.propose({
@@ -738,7 +769,12 @@ export class Engine {
     if (config.mode === "live") {
       this.liara.assertWritable(input.target);
       if (
-        !["restart_app", "deploy_release", "create_backup"].includes(input.kind)
+        ![
+          "restart_app",
+          "deploy_release",
+          "create_backup",
+          ...(this.recovery.available() ? ["restore_backup"] : []),
+        ].includes(input.kind)
       )
         throw new Error(
           "این عملیات در اتصال واقعی پیاده‌سازی نشده است؛ عملیاتی اجرا نشد.",
@@ -768,15 +804,18 @@ export class Engine {
         cost:
           config.mode === "demo"
             ? "بدون هزینه یا پرداخت در محیط نمایشی"
-            : "مصرف پلن فعلی؛ هزینهٔ ساخت طبق حساب لیارا",
+            : "مصرف پلن فعلی؛ هزینهٔ ساخت و فضای نسخهٔ ایمنی مطابق تعرفهٔ حساب لیارا",
       },
       restore_backup: {
         title: "بازگردانی نسخهٔ پشتیبان",
         description:
-          "سفارش‌های فروشگاه محلی از نسخهٔ انتخاب‌شده بازیابی می‌شوند.",
+          "سفارش‌های گل‌بازار از نسخهٔ آزمایش‌شده بازیابی می‌شوند. ابتدا نسخهٔ ایمنی تهیه می‌شود.",
         impact:
           "سفارش‌های ثبت‌شده بعد از این نسخه حذف می‌شوند؛ پیش از اجرا نسخهٔ ایمنی می‌گیرم.",
-        cost: "آزمایشی؛ بدون پرداخت",
+        cost:
+          config.mode === "demo"
+            ? "آزمایشی؛ بدون پرداخت"
+            : "نگهداری نسخهٔ ایمنی روی همین دستگاه؛ مصرف پلن فعلی برنامه",
       },
       create_backup: {
         title: "تهیهٔ نسخهٔ پشتیبان",
@@ -803,7 +842,7 @@ export class Engine {
         cost: "نمایشی · بدون پرداخت واقعی",
       },
     };
-    const params: Record<string, string> = {};
+    const params: Record<string, string> = { scope: this.recovery.scope() };
     if (input.backupId) params.backupId = input.backupId;
     if (input.kind === "deploy_release") {
       if (input.projectId) {
@@ -835,11 +874,28 @@ export class Engine {
             : `ارسال همان سورس تحلیل‌شده (${project.hash.slice(0, 12)}) با پلتفرم ${project.platform} و پورت ${project.port} به ${input.target}. فایل‌های محرمانه ارسال نمی‌شوند. دستورهای build و start پروژه در لیارا اجرا می‌شوند.`;
       } else params.sourceHash = sourceHash();
     }
-    if (
-      input.kind === "restore_backup" &&
-      !this.db.get<Backup>("backups", input.backupId || "")
-    )
-      throw new Error("نسخهٔ پشتیبان پیدا نشد.");
+    if (input.kind === "restore_backup") {
+      const preview = this.db.value<RestorePreview | null>(
+        `restore-preview:${input.backupId}`,
+        null,
+      );
+      const { record } = this.recovery.read(input.backupId || "");
+      if (
+        !preview ||
+        Date.parse(preview.expiresAt) <= Date.now() ||
+        preview.checksum !== record.checksum
+      )
+        throw new Error(
+          "ابتدا اثر بازیابی را بررسی کنید؛ پیش‌نمایش پنج دقیقه اعتبار دارد.",
+        );
+      params.currentHash = preview.currentHash;
+      params.backupChecksum = preview.checksum;
+      params.previewExpiresAt = preview.expiresAt;
+      params.backupCount = String(preview.backupCount);
+      params.currentCount = String(preview.currentCount);
+      params.removedCount = String(preview.removedCount);
+      params.changedCount = String(preview.changedCount);
+    }
     if (input.incidentId) {
       const incident = this.db.get<Incident>("incidents", input.incidentId);
       if (
@@ -868,7 +924,10 @@ export class Engine {
       ...descriptions[input.kind],
       status: "pending",
       createdAt: now(),
-      expiresAt: new Date(Date.now() + 15 * 60000).toISOString(),
+      expiresAt:
+        input.kind === "restore_backup"
+          ? params.previewExpiresAt
+          : new Date(Date.now() + 15 * 60000).toISOString(),
       incidentId: input.incidentId,
       params,
       fingerprint: digest({ kind: input.kind, target: input.target, params }),
@@ -935,6 +994,16 @@ export class Engine {
       this.emit();
       return;
     }
+    if (action.params.scope !== this.recovery.scope())
+      throw new Error("حساب یا فروشگاه تغییر کرده است؛ درخواست تازه بسازید.");
+    if (action.target !== this.appId())
+      throw new Error("فروشگاه هدف تغییر کرده است.");
+    if (config.mode === "live") this.liara.assertWritable(action.target);
+    if (
+      action.kind === "restore_backup" &&
+      Date.parse(action.params.previewExpiresAt) <= Date.now()
+    )
+      throw new Error("پیش‌نمایش بازیابی منقضی شده؛ دوباره بررسی کنید.");
     // No await before claiming: concurrent approval requests cannot dispatch twice.
     this.executing = true;
     this.db.put("actions", { ...action, status: "executing" });
@@ -951,18 +1020,31 @@ export class Engine {
         "تأیید شما دریافت شد؛ در حال اجرا.",
       );
     this.emit();
+    const step = (
+      label: string,
+      status: "running" | "done" | "failed" = "done",
+    ) => {
+      action.steps = [...(action.steps || []), { label, status, at: now() }];
+      this.db.put("actions", { ...action, status: "executing" });
+      this.emit();
+    };
     try {
+      step("تأیید شما و فروشگاه مقصد بررسی شد");
       if (action.kind === "restart_app") {
         if (config.mode === "demo") await this.control("restart", {});
         else await this.liara.restart(action.target);
       }
       if (action.kind === "create_backup") {
-        await this.createBackup();
+        step("در حال تهیه و آزمایش نسخهٔ پشتیبان", "running");
+        const backup = await this.createBackup();
+        step("ذخیره‌شدن نسخهٔ پشتیبان بررسی شد");
         await this.refresh();
         const note =
           config.mode === "demo"
             ? "نسخهٔ پشتیبان محلی ذخیره و قابل بازیابی است."
-            : "درخواست تهیهٔ پشتیبان پذیرفته شد؛ آماده‌شدن فایل را از فهرست پشتیبان‌های لیارا بررسی کنید.";
+            : backup?.verifiedAt
+              ? "نسخهٔ سفارش‌ها ذخیره، بازخوانی و در جدول جداگانه آزمایش شد."
+              : "فایل تازهٔ پشتیبان در فهرست لیارا دیده شد؛ آزمایش بازیابی این فایل انجام نشده است.";
         this.db.put("actions", {
           ...action,
           status: "completed",
@@ -978,16 +1060,14 @@ export class Engine {
         return;
       }
       if (action.kind === "restore_backup") {
-        await this.createBackup();
-        const backup = this.db.value<{ orders: unknown[] } | null>(
-          `backup:${action.params.backupId}`,
-          null,
+        step("در حال تهیهٔ نسخهٔ ایمنی از سفارش‌های فعلی", "running");
+        await this.createBackup("نسخهٔ ایمنی پیش از بازیابی");
+        step("نسخهٔ ایمنی ذخیره و آزمایش شد");
+        await this.recovery.restore(
+          action.params.backupId,
+          action.params.currentHash,
         );
-        if (!backup) throw new Error("محتوای نسخه پیدا نشد.");
-        await this.control("restore", backup);
-        const restored = await this.control("backup");
-        if (digest(restored.orders) !== digest(backup.orders))
-          throw new Error("محتوای بازیابی با نسخهٔ انتخاب‌شده یکسان نیست.");
+        step("سفارش‌های بازیابی‌شده با نسخهٔ انتخابی تطبیق داده شد");
       }
       if (action.kind === "enable_redis") await this.control("cache", {});
       if (action.kind === "enable_email") this.db.set("emailEnabled", true);
@@ -1003,6 +1083,17 @@ export class Engine {
           throw new Error(
             "سورس از زمان تأیید تغییر کرده است؛ درخواست انتشار تازه بسازید.",
           );
+        if (config.mode === "live" || !imported) {
+          step("در حال تهیهٔ نسخهٔ ایمنی پیش از انتشار", "running");
+          await this.createBackup("نسخهٔ ایمنی پیش از انتشار");
+          step("نسخهٔ ایمنی آماده است؛ انتشار می‌تواند شروع شود");
+        }
+        step(
+          imported && config.mode === "demo"
+            ? "در حال ساخت پیش‌نمایش بسته؛ بدون اجرای کد"
+            : "در حال ارسال نسخهٔ تأییدشده",
+          "running",
+        );
         if (config.mode === "live") {
           const archive = path.join(config.dataDir, "golbazar.tar.gz");
           if (!imported) {
@@ -1074,6 +1165,7 @@ export class Engine {
           "VERIFYING",
           "عملیات ارسال شد؛ اکنون نتیجهٔ واقعی را بررسی می‌کنم.",
         );
+      step("در حال بررسی سایت و ثبت سفارش در دو نوبت", "running");
       let verified = false;
       let last: Probe | undefined;
       let consecutiveSuccess = 0;
@@ -1088,7 +1180,10 @@ export class Engine {
           const release = releases.releases?.find(
             (r: { _id: string }) => r._id === expectedRelease,
           );
-          if (release && ["failed", "error"].includes(release.state))
+          if (
+            release &&
+            ["failed", "error"].includes(String(release.state).toLowerCase())
+          )
             throw new Error("ساخت نسخهٔ جدید در لیارا ناموفق بود.");
           if (releases.currentRelease !== expectedRelease) {
             this.db.audit(
@@ -1114,6 +1209,7 @@ export class Engine {
         throw new Error(
           `بهبود کامل تأیید نشد. سلامت: ${last?.healthOk ? "موفق" : "ناموفق"}، مسیر کسب‌وکار: ${last?.businessOk ? "موفق" : "ناموفق"}. ${last?.error || "نیاز به بررسی بیشتر؛ رخداد بسته نشد."}`,
         );
+      step("دو بررسی پیاپی ثبت سفارش و سلامت سایت موفق بود");
       this.db.put("actions", { ...action, status: "completed" });
       this.failures = 0;
       this.db.set("outageLatched", false);
@@ -1141,6 +1237,7 @@ export class Engine {
       );
     } catch (e) {
       const error = redact((e as Error).message);
+      step(error, "failed");
       this.db.put("actions", { ...action, status: "failed", error });
       if (action.incidentId) {
         const incident = this.db.get<Incident>("incidents", action.incidentId);
@@ -1159,21 +1256,183 @@ export class Engine {
       this.emit();
     }
   }
-  async createBackup() {
-    if (config.mode === "live") return this.liara.createBackup(this.appId());
-    const payload = await this.control("backup");
-    const id = randomUUID();
-    this.db.set(`backup:${id}`, payload);
-    this.db.put("backups", {
-      id,
-      name: `گل‌بازار · ${new Intl.DateTimeFormat("fa-IR", { hour: "2-digit", minute: "2-digit", timeZone: "Asia/Tehran" }).format(new Date())}`,
-      at: now(),
-      size: `${(Buffer.byteLength(JSON.stringify(payload)) / 1024).toFixed(1)} KB`,
-      status: "ready",
-      source: "demo",
-    } satisfies Backup);
-    this.db.audit("backup", "نسخهٔ پشتیبان محلی ذخیره شد", id);
+  async createBackup(purpose = "پشتیبان سفارش‌ها") {
+    if (this.recovery.available()) {
+      const record = await this.recovery.create(purpose);
+      this.emit();
+      return record;
+    }
+    // Liara accepting POST is not proof that the backup file exists.
+    if (!config.databaseId)
+      throw new Error(
+        "دیتابیس این فروشگاه هنوز انتخاب نشده؛ از راه‌اندازی آسان اتصال آن را کامل کنید.",
+      );
+    const pendingKey = `backup-submission:${this.recovery.scope()}`;
+    let pending = this.db.value<{ before: string[]; at: string } | null>(
+      pendingKey,
+      null,
+    );
+    if (!pending) {
+      pending = {
+        before: (await this.liara.backups()).map((b) => b.id),
+        at: now(),
+      };
+      // Persist before dispatch, so interruption or timeout cannot blindly repeat a write.
+      this.db.set(pendingKey, pending);
+      try {
+        await this.liara.createBackup(this.appId());
+      } catch (error) {
+        if (
+          error instanceof LiaraError &&
+          [400, 401, 402, 403, 404, 422].includes(error.status)
+        )
+          this.db.set(pendingKey, null);
+        throw error;
+      }
+    }
+    const before = new Set(pending.before);
+    for (let i = 0; i < 30; i++) {
+      await wait(2000);
+      const backups = await this.liara.backups();
+      const created = backups.find(
+        (b) => !before.has(b.id) && b.status === "ready" && (b.bytes || 0) > 0,
+      );
+      this.db.set("backupsCache", backups);
+      this.db.set(`backupsCache:${this.recovery.scope()}`, backups);
+      if (created) {
+        this.db.set(pendingKey, null);
+        this.db.audit(
+          "backup_observed",
+          "فایل پشتیبان تازه در لیارا مشاهده شد",
+          created.id,
+        );
+        return created;
+      }
+    }
+    throw new Error(
+      "درخواست پشتیبان ارسال شد، اما آماده‌شدن فایل هنوز تأیید نشده؛ عملیات بعدی اجرا نشد. فهرست را دوباره بررسی کنید؛ درخواست تکراری خودکار ارسال نمی‌شود.",
+    );
+  }
+  async prepareRestore(id: string) {
+    return this.recovery.preview(id);
+  }
+  care(): CareState {
+    const last = this.db
+      .list<Probe>("probes")
+      .find((p) => p.scope === this.recovery.scope());
+    const stale =
+      !last ||
+      Date.now() - Date.parse(last.at) > Math.max(config.intervalMs * 3, 20000);
+    const policy = this.db.value(`care-policy:${this.recovery.scope()}`, {
+      enabled: false,
+      everyHours: 6,
+      approvedAt: undefined as string | undefined,
+    });
+    const backups = [
+      ...this.recovery.list(),
+      ...(config.mode === "live"
+        ? this.db.value<Backup[]>(`backupsCache:${this.recovery.scope()}`, [])
+        : []),
+    ].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+    return {
+      websiteUrl:
+        config.mode === "demo"
+          ? config.demoUrl
+          : config.healthUrl
+            ? new URL(config.healthUrl).origin
+            : undefined,
+      health: !this.settings().monitoring
+        ? "paused"
+        : !last
+          ? "unknown"
+          : stale
+            ? "stale"
+            : last.healthy
+              ? "healthy"
+              : "unhealthy",
+      lastCheck: last?.at,
+      websiteOk: stale ? undefined : last?.healthOk,
+      ordersOk: stale ? undefined : last?.businessOk,
+      policy,
+      lastBackup: backups[0],
+      nextBackupAt: policy.enabled
+        ? new Date(
+            Math.max(
+              Date.now(),
+              Date.parse(backups[0]?.at || policy.approvedAt || now()) +
+                (backups.length ? policy.everyHours * 3600000 : 0),
+            ),
+          ).toISOString()
+        : undefined,
+      backupError:
+        this.db.value(`care-error:${this.recovery.scope()}`, "") || undefined,
+      restoreAvailable: this.recovery.available(),
+    };
+  }
+  setProtection(enabled: boolean, confirm: boolean) {
+    if (enabled && !confirm)
+      throw new Error("زمان‌بندی پشتیبان به تأیید شما نیاز دارد.");
+    if (enabled && config.mode === "live")
+      this.liara.assertWritable(this.appId());
+    const policy = { enabled, everyHours: 6, approvedAt: now() };
+    this.db.set(`care-policy:${this.recovery.scope()}`, policy);
+    this.db.audit(
+      "backup_policy",
+      enabled
+        ? "پشتیبان‌گیری هر ۶ ساعت با تأیید شما فعال شد"
+        : "پشتیبان‌گیری زمان‌بندی‌شده متوقف شد",
+      "Maximum 28 scheduled snapshots; no automatic removal; storage tariffs apply in live mode",
+      "user",
+    );
     this.emit();
+    return policy;
+  }
+  async protect() {
+    const care = this.care(),
+      scope = this.recovery.scope();
+    if (
+      !care.policy.enabled ||
+      this.executing ||
+      this.probing ||
+      this.refreshing
+    )
+      return;
+    if (
+      care.lastBackup &&
+      Date.now() - Date.parse(care.lastBackup.at) <
+        care.policy.everyHours * 3600000
+    )
+      return;
+    if (Date.now() - this.db.value(`care-attempt:${scope}`, 0) < 600000) return;
+    if (this.db.value(`care-scheduled-count:${scope}`, 0) >= 28) {
+      this.db.set(
+        `care-error:${scope}`,
+        "۲۸ نسخهٔ زمان‌بندی‌شده ذخیره شده؛ برای ادامهٔ پشتیبان‌گیری، فضای نگهداری باید بررسی شود.",
+      );
+      this.emit();
+      return;
+    }
+    this.executing = true;
+    this.db.set(`care-attempt:${scope}`, Date.now());
+    try {
+      await this.createBackup("پشتیبان زمان‌بندی‌شده");
+      this.db.set(
+        `care-scheduled-count:${scope}`,
+        this.db.value(`care-scheduled-count:${scope}`, 0) + 1,
+      );
+      this.db.set(`care-error:${scope}`, "");
+    } catch (e) {
+      this.db.set(`care-error:${scope}`, redact((e as Error).message));
+      this.db.set(`care-policy:${scope}`, { ...care.policy, enabled: false });
+      this.db.audit(
+        "backup_failed",
+        "پشتیبان زمان‌بندی‌شده تأیید نشد",
+        redact((e as Error).message),
+      );
+    } finally {
+      this.executing = false;
+      this.emit();
+    }
   }
   async chat(text: string) {
     this.message("user", text, "system");
@@ -1219,7 +1478,7 @@ export class Engine {
       answer = `گفتگوها، رخدادها، شواهد و تأییدهای شما در حافظهٔ SQLite ذخیره شده‌اند؛ اکنون ${this.db.list("messages").length} پیام و ${this.db.auditList().length} رویداد ثبت شده است. در اتصال واقعی، شناسهٔ ایجنت و حافظهٔ Cursor هم برای ادامهٔ گفتگو حفظ می‌شود.`;
     this.message("assistant", answer, "demo");
   }
-  async demoFault(kind: "pool" | "persistent" | "none") {
+  async demoFault(kind: "pool" | "persistent" | "checkout" | "none") {
     if (config.mode !== "demo")
       throw new Error("آزمایش اختلال در حالت واقعی در دسترس نیست.");
     if (this.executing) throw new Error("منتظر پایان عملیات فعلی بمانید.");
@@ -1258,6 +1517,7 @@ export class Engine {
   }
   snapshot(): Snapshot {
     return {
+      care: this.care(),
       mode: config.mode,
       managedAppId: this.appId(),
       agentProvider:
@@ -1269,13 +1529,23 @@ export class Engine {
       services: this.services,
       incidents: this.db.list("incidents"),
       actions: this.db.list("actions"),
-      probes: this.db.list<Probe>("probes").slice(0, 120).reverse(),
+      probes: this.db
+        .list<Probe>("probes")
+        .filter((p) => p.scope === this.recovery.scope())
+        .slice(0, 120)
+        .reverse(),
       messages: this.db.list<Message>("messages").slice(0, 300).reverse(),
       audit: this.db.auditList(),
       backups:
         config.mode === "demo"
-          ? this.db.list("backups")
-          : this.db.value("backupsCache", []),
+          ? this.recovery.list()
+          : [
+              ...this.recovery.list(),
+              ...this.db.value<Backup[]>(
+                `backupsCache:${this.recovery.scope()}`,
+                [],
+              ),
+            ],
       releases:
         config.mode === "demo"
           ? this.db.list("releases")
@@ -1319,7 +1589,7 @@ export class Engine {
         {
           key: "restore",
           label: "بازیابی پشتیبان",
-          available: config.mode === "demo",
+          available: this.recovery.available(),
           reason:
             "بازیابی ابری در OpenAPI بررسی‌شده مستند نیست؛ مسیر دستی لیارا لازم است.",
         },
@@ -1351,10 +1621,12 @@ export class Engine {
     this.domains.start();
     void this.refresh();
     this.timer = setInterval(() => {
-      void this.tick().catch((e) => {
-        this.notices = [redact((e as Error).message)];
-        this.emit();
-      });
+      void this.tick()
+        .then(() => this.protect())
+        .catch((e) => {
+          this.notices = [redact((e as Error).message)];
+          this.emit();
+        });
     }, config.intervalMs);
     this.initialTimer = setTimeout(
       () => void this.tick().catch(() => {}),

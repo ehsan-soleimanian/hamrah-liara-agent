@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import "@fontsource-variable/vazirmatn";
 import App from "./App";
 import "./styles.css";
+import "./care.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />

@@ -247,6 +247,27 @@ function setup(mode: "demo" | "live" = "live") {
   };
 }
 
+test("sample control credential is generated, encrypted and connected without asking the novice for an env value", async () => {
+  const s = setup("demo");
+  try {
+    s.project.envNames.push("HAMRAH_CONTROL_TOKEN");
+    s.db.put("projects", s.project);
+    const quote = await s.provision.quote(s.input);
+    const secret = s.vault.get<any>(`quote:${quote.id}`).input.env
+      .HAMRAH_CONTROL_TOKEN;
+    assert.ok(secret.length >= 64);
+    assert.equal(JSON.stringify(quote).includes(secret), false);
+    await s.provision.approve(quote.id, quote.fingerprint, true);
+    await settled(s.provision);
+    assert.equal(
+      s.vault.get<any>(`app-env:${quote.id}`).HAMRAH_CONTROL_TOKEN,
+      secret,
+    );
+  } finally {
+    s.close();
+  }
+});
+
 test("catalog uses official resource and feature prices, excludes unknown or unavailable prices", () => {
   const account = me();
   const result = parseCatalog(account, { networks: [] });

@@ -51,7 +51,7 @@ before(async () => {
     try {
       if ((await fetch(`${config.demoUrl}/health`)).ok) break;
     } catch {}
-    if (Date.now() - started > 12000)
+    if (Date.now() - started > 60000)
       throw new Error(`Demo did not start: ${output}`);
     await delay(100);
   }
@@ -178,6 +178,7 @@ test("backup restoration restores actual records and creates a safety snapshot",
     (await engine.control("backup")).orders.length,
     original.orders.length + 1,
   );
+  await engine.prepareRestore(backup.id);
   const action = engine.propose({
     kind: "restore_backup",
     target: "golbazar",

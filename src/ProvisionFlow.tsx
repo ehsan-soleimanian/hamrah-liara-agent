@@ -588,69 +588,78 @@ export default function ProvisionFlow({
                         اتصال‌های دیتابیس خودکار پر می‌شوند. فقط اطلاعات
                         سرویس‌های دیگر را وارد کنید.
                       </p>
-                      {report.envNames.map((n) => (
-                        <div className="provision-env-field" key={n}>
-                          <label htmlFor={`env-source-${n}`}>
-                            <bdi>{n}</bdi>
-                            <select
-                              id={`env-source-${n}`}
-                              value={bindings[n] || "manual"}
-                              onChange={(e) =>
-                                setBindings((current) => ({
-                                  ...current,
-                                  [n]: e.target.value,
-                                }))
-                              }
-                            >
-                              <option value="manual">
-                                خودم مقدارش را وارد می‌کنم
-                              </option>
-                              {!/^(NEXT_PUBLIC_|VITE_|PUBLIC_)/.test(n) &&
-                                databases.flatMap((d, i) =>
-                                  Object.entries(partLabels).map(
-                                    ([part, label]) => (
-                                      <option
-                                        key={`${i}:${part}`}
-                                        value={`${i}:${part}`}
-                                      >
-                                        {labels[d.type]} · {label}
-                                      </option>
-                                    ),
-                                  ),
-                                )}
-                            </select>
-                          </label>
-                          {!bindings[n] || bindings[n] === "manual" ? (
-                            <label htmlFor={`env-value-${n}`}>
-                              <span className="sr-only">مقدار {n}</span>
-                              <input
-                                id={`env-value-${n}`}
-                                type="password"
-                                dir="ltr"
-                                autoComplete="off"
-                                required
-                                value={env[n] || ""}
+                      {report.envNames.map((n) =>
+                        ["HAMRAH_CONTROL_TOKEN", "TEST_CONTROL_TOKEN"].includes(
+                          n,
+                        ) ? (
+                          <div className="provision-auto" key={n}>
+                            <ShieldCheck size={16} /> کلید امن مراقبت از
+                            گل‌بازار خودکار ساخته و متصل می‌شود.
+                          </div>
+                        ) : (
+                          <div className="provision-env-field" key={n}>
+                            <label htmlFor={`env-source-${n}`}>
+                              <bdi>{n}</bdi>
+                              <select
+                                id={`env-source-${n}`}
+                                value={bindings[n] || "manual"}
                                 onChange={(e) =>
-                                  setEnv((current) => ({
+                                  setBindings((current) => ({
                                     ...current,
                                     [n]: e.target.value,
                                   }))
                                 }
-                              />
-                              <small>
-                                {envHelp(n)}
-                                {/^(NEXT_PUBLIC_|VITE_|PUBLIC_)/.test(n) &&
-                                  " این متغیر در مرورگر کاربران قابل مشاهده است؛ رمز محرمانه وارد نکنید."}
-                              </small>
+                              >
+                                <option value="manual">
+                                  خودم مقدارش را وارد می‌کنم
+                                </option>
+                                {!/^(NEXT_PUBLIC_|VITE_|PUBLIC_)/.test(n) &&
+                                  databases.flatMap((d, i) =>
+                                    Object.entries(partLabels).map(
+                                      ([part, label]) => (
+                                        <option
+                                          key={`${i}:${part}`}
+                                          value={`${i}:${part}`}
+                                        >
+                                          {labels[d.type]} · {label}
+                                        </option>
+                                      ),
+                                    ),
+                                  )}
+                              </select>
                             </label>
-                          ) : (
-                            <div className="provision-auto">
-                              <CheckCircle2 size={16} /> همراه بعد از ساخت سرویس
-                              این مقدار را امن وارد می‌کند.
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                            {!bindings[n] || bindings[n] === "manual" ? (
+                              <label htmlFor={`env-value-${n}`}>
+                                <span className="sr-only">مقدار {n}</span>
+                                <input
+                                  id={`env-value-${n}`}
+                                  type="password"
+                                  dir="ltr"
+                                  autoComplete="off"
+                                  required
+                                  value={env[n] || ""}
+                                  onChange={(e) =>
+                                    setEnv((current) => ({
+                                      ...current,
+                                      [n]: e.target.value,
+                                    }))
+                                  }
+                                />
+                                <small>
+                                  {envHelp(n)}
+                                  {/^(NEXT_PUBLIC_|VITE_|PUBLIC_)/.test(n) &&
+                                    " این متغیر در مرورگر کاربران قابل مشاهده است؛ رمز محرمانه وارد نکنید."}
+                                </small>
+                              </label>
+                            ) : (
+                              <div className="provision-auto">
+                                <CheckCircle2 size={16} /> همراه بعد از ساخت
+                                سرویس این مقدار را امن وارد می‌کند.
+                              </div>
+                            )}
+                          </div>
+                        ),
+                      )}
                     </section>
                   )}
                   <details className="intake-advanced">

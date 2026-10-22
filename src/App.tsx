@@ -1,3 +1,7 @@
+import CareDashboard, {
+  ActionProgress,
+  ProtectionPanel,
+} from "./CareDashboard";
 import {
   useState,
   useEffect,
@@ -353,11 +357,13 @@ export default function App() {
     dependenciesReady?: boolean,
   ) {
     if (!state) return;
-    if (kind === "deploy_release" && !projectId) {
+    if (kind === "deploy_release" && !projectId && state.mode !== "demo") {
       navigate("setup");
       return;
     }
     await run("propose", async () => {
+      if (kind === "restore_backup" && backupId)
+        await api(`/backups/${backupId}/preview`);
       const a = await api<Action>("/actions", {
         kind,
         target: state.managedAppId,
@@ -444,16 +450,37 @@ export default function App() {
               فضای کاری {state.settings.businessName}
             </Dialog.Description>
             <nav aria-label="منوی موبایل">
-              {pages.map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  className={cn("nav-item", page === id && "active")}
-                  onClick={() => navigate(id)}
-                >
-                  <Icon size={20} />
-                  {label}
-                </button>
-              ))}
+              {pages
+                .filter((p) => !["services", "growth", "memory"].includes(p.id))
+                .map(({ id, label, icon: Icon }) => (
+                  <button
+                    key={id}
+                    className={cn("nav-item", page === id && "active")}
+                    onClick={() => navigate(id)}
+                  >
+                    <Icon size={20} />
+                    {label}
+                  </button>
+                ))}
+              <details className="care-more-nav">
+                <summary>
+                  ابزارهای بیشتر <ChevronDown size={15} />
+                </summary>
+                {pages
+                  .filter((p) =>
+                    ["services", "growth", "memory"].includes(p.id),
+                  )
+                  .map(({ id, label, icon: Icon }) => (
+                    <button
+                      className="nav-item"
+                      key={id}
+                      onClick={() => navigate(id)}
+                    >
+                      <Icon size={19} />
+                      {label}
+                    </button>
+                  ))}
+              </details>
             </nav>
             <button className="nav-item" onClick={() => navigate("settings")}>
               <Settings size={20} />
@@ -498,21 +525,43 @@ export default function App() {
         </button>
         <div className="nav-caption">فضای کسب‌وکار</div>
         <nav aria-label="ناوبری اصلی">
-          {pages.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => navigate(id)}
-              aria-current={page === id ? "page" : undefined}
-              className={cn("nav-item", page === id && "active")}
-            >
-              <Icon size={19} aria-hidden="true" />
-              <span>{label}</span>
-              {id === "incidents" && active.length > 0 && (
-                <span className="nav-counter">{fa(active.length)}</span>
-              )}
-              {id === "growth" && <span className="new-dot" />}
-            </button>
-          ))}
+          {pages
+            .filter((p) => !["services", "growth", "memory"].includes(p.id))
+            .map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => navigate(id)}
+                aria-current={page === id ? "page" : undefined}
+                className={cn("nav-item", page === id && "active")}
+              >
+                <Icon size={19} aria-hidden="true" />
+                <span>{label}</span>
+                {id === "incidents" && active.length > 0 && (
+                  <span className="nav-counter">{fa(active.length)}</span>
+                )}
+                {id === "growth" && <span className="new-dot" />}
+              </button>
+            ))}
+          <details
+            className="care-more-nav"
+            open={["services", "growth", "memory"].includes(page) || undefined}
+          >
+            <summary>
+              ابزارهای بیشتر <ChevronDown size={15} />
+            </summary>
+            {pages
+              .filter((p) => ["services", "growth", "memory"].includes(p.id))
+              .map(({ id, label, icon: Icon }) => (
+                <button
+                  className={cn("nav-item", page === id && "active")}
+                  key={id}
+                  onClick={() => navigate(id)}
+                >
+                  <Icon size={19} />
+                  {label}
+                </button>
+              ))}
+          </details>
         </nav>
         <div className="sidebar-bottom">
           <div className="agent-mini">
@@ -644,16 +693,16 @@ export default function App() {
             <div>
               <div className="eyebrow">
                 {page === "overview"
-                  ? "یک قدم جلوتر، همیشه همراه شما"
+                  ? state.settings.businessName + " / مراقبت از فروشگاه"
                   : state.settings.businessName + " / " + title}
               </div>
               <h1>
-                {page === "overview" ? "با خیال راحت، رشد کنید" : title}
+                {page === "overview" ? "فروشگاه شما، زیر مراقبت" : title}
                 <span className="heading-dot">.</span>
               </h1>
               <p>
                 {page === "overview"
-                  ? "همراه حواسش به زیرساخت هست؛ شما به ایده‌های بزرگ‌تر برسید."
+                  ? "سفارش‌ها، اطلاعات و تغییرات مهم؛ ساده و قابل پیگیری."
                   : page === "incidents"
                     ? "از اولین نشانه تا تأیید رفع مشکل، همه‌چیز قابل پیگیری است."
                     : page === "services"
@@ -677,7 +726,7 @@ export default function App() {
                 onClick={() =>
                   window.open(
                     state.mode === "demo"
-                      ? "http://127.0.0.1:3002"
+                      ? state.care?.websiteUrl || "http://127.0.0.1:3002"
                       : state.services.find((s) => s.url)?.url ||
                           "https://console.liara.ir",
                     "_blank",
@@ -704,177 +753,19 @@ export default function App() {
             ) : null}
           </div>
           {page === "overview" && (
-            <>
-              <section
-                className={cn(
-                  "hero-card",
-                  active.length > 0 && "hero-attention",
-                )}
-              >
-                <img className="hero-art" src="/guardian.webp" alt="" />
-                <div className="hero-shade" />
-                <div className="hero-copy">
-                  <Badge
-                    tone={active.length ? "amber" : healthy ? "green" : "gray"}
-                  >
-                    {active.length
-                      ? "یک موضوع نیاز به توجه شما دارد"
-                      : healthy
-                        ? "همه‌چیز تحت مراقبت است"
-                        : "همراه در حال بررسی است"}
-                  </Badge>
-                  <h2>
-                    {active.length ? (
-                      <>
-                        با هم، از پسِ
-                        <br />
-                        این مشکل برمی‌آییم.
-                      </>
-                    ) : (
-                      <>
-                        کسب‌وکار شما،
-                        <br />
-                        در دست‌های امن.
-                      </>
-                    )}
-                  </h2>
-                  <p>
-                    {active.length
-                      ? pending.length
-                        ? "مشکل را پیدا کرده‌ام. راهکار و شواهد آماده‌اند؛ تصمیم نهایی با شماست."
-                        : "این رخداد هنوز باز است. نتیجهٔ بررسی و مسیر بعدی را ببینید؛ همراه پیگیر نتیجه می‌ماند."
-                      : "من وضعیت سایت را بررسی می‌کنم، مشکلات را پیدا می‌کنم و تا مطمئن نشوم حل شده‌اند، پیگیر می‌مانم."}
-                  </p>
-                  <div className="hero-actions">
-                    <Button
-                      variant="primary"
-                      icon={active.length ? ShieldCheck : MessageCircle}
-                      onClick={() =>
-                        active.length
-                          ? setIncident(active[0])
-                          : setChatOpen(true)
-                      }
-                    >
-                      {active.length
-                        ? pending.length
-                          ? "بررسی پیشنهاد همراه"
-                          : "پیگیری رخداد"
-                        : "گفتگو با همراه"}
-                      <ArrowUpLeft size={16} />
-                    </Button>
-                    <button
-                      className="text-button"
-                      onClick={() => setDemoOpen(true)}
-                    >
-                      <Play size={14} />
-                      {state.mode === "demo"
-                        ? "یک اختلال را آزمایش کنید"
-                        : "همراه چطور کار می‌کند؟"}
-                    </button>
-                  </div>
-                  <div className="hero-footnote">
-                    <ShieldCheck size={14} />
-                    هر تغییر مهم، فقط با تأیید شما
-                  </div>
-                </div>
-                <div className="hero-image-caption">
-                  <span className="orbit-dot" />
-                  <span>یک همراهِ همیشه بیدار</span>
-                  <small>PROACTIVE · ACCOUNTABLE</small>
-                </div>
-              </section>
-              <Stats state={state} pending={pending.length} />
-              {pending.length > 0 && (
-                <div className="approval-strip">
-                  <span className="icon-tile amber">
-                    <ShieldCheck size={20} />
-                  </span>
-                  <div>
-                    <strong>یک تصمیم کوچک، برای یک خیال راحت</strong>
-                    <p>
-                      {pending[0].title} · {pending[0].cost}
-                    </p>
-                  </div>
-                  <Button
-                    onClick={() => {
-                      setApproval(pending[0]);
-                      setRestoreText("");
-                    }}
-                    variant="primary"
-                  >
-                    بررسی و تأیید
-                    <ArrowLeft size={16} />
-                  </Button>
-                </div>
-              )}
-              <div className="dashboard-grid">
-                <HealthChart
-                  state={state}
-                  onCheck={() =>
-                    run("check", () => api("/check"), "بررسی تازه انجام شد.")
-                  }
-                  busy={busy === "check"}
-                />
-                <ActivityCard
-                  state={state}
-                  onAll={() => navigate("memory")}
-                  onChat={() => setChatOpen(true)}
-                />
-              </div>
-              <section className="services-section">
-                <SectionHeading
-                  title="زیرساخت شما، در یک نگاه"
-                  subtitle="هر چیزی که کسب‌وکارتان را سرپا نگه می‌دارد"
-                  action={
-                    <button
-                      className="text-button muted-text"
-                      onClick={() => navigate("services")}
-                    >
-                      همهٔ سرویس‌ها
-                      <ArrowLeft size={15} />
-                    </button>
-                  }
-                />
-                <div className="service-grid">
-                  {state.services.slice(0, 3).map((s) => (
-                    <ServiceCard
-                      key={s.id}
-                      service={s}
-                      onClick={() => void showService(s)}
-                    />
-                  ))}
-                  {state.services.length === 0 && (
-                    <Empty
-                      icon={Cloud}
-                      title="سرویسی دریافت نشده"
-                      text="اتصال لیارا را در تنظیمات بررسی کنید."
-                      action={
-                        <Button onClick={() => navigate("settings")}>
-                          بررسی اتصال
-                        </Button>
-                      }
-                    />
-                  )}
-                </div>
-              </section>
-              <div className="growth-teaser">
-                <div className="growth-spark">
-                  <Sparkles size={22} />
-                </div>
-                <div>
-                  <strong>برای قدم بعدی‌تان، چند ایده دارم.</strong>
-                  <p>از سریع‌تر شدن فروشگاه تا ارتباط بهتر با مشتری‌ها</p>
-                </div>
-                <button
-                  className="text-button"
-                  onClick={() => navigate("growth")}
-                >
-                  کشف فرصت‌ها
-                  <ArrowLeft size={17} />
-                </button>
-                <span className="subtle-orbit" />
-              </div>
-            </>
+            <CareDashboard
+              state={state}
+              online={online}
+              busy={!!busy}
+              navigate={navigate}
+              approve={(a) => {
+                setApproval(a);
+                setRestoreText("");
+              }}
+              incident={setIncident}
+              propose={(kind, id) => void propose(kind, id)}
+              run={run}
+            />
           )}
           {page === "setup" && <SetupPage state={state} />}{" "}
           {page === "services" && (
@@ -1019,11 +910,11 @@ export default function App() {
                   <Rocket size={30} />
                 </span>
                 <div>
-                  <h2>آمادهٔ انتشار ایدهٔ بعدی؟</h2>
+                  <h2>نسخهٔ تازه، با بررسی سفارش‌گیری</h2>
                   <p>
                     {state.mode === "demo"
-                      ? "مسیر انتشار و تأیید را در محیط نمایشی تجربه کنید."
-                      : "سورس آمادهٔ گل‌بازار روی برنامهٔ انتخاب‌شدهٔ لیارا منتشر می‌شود. این کار نسخهٔ فعلی را جایگزین می‌کند."}
+                      ? "انتشار نمونهٔ محلی را با نسخهٔ ایمنی و آزمایش سفارش‌گیری تجربه کنید. پروژهٔ آپلودشده فقط پیش‌نمایش بسته است."
+                      : "همان سورس تحلیل‌شده، پس از تأیید شما و آماده‌شدن نسخهٔ ایمنی منتشر می‌شود. در پایان، نسخهٔ فعال و سفارش‌گیری بررسی می‌شوند."}
                   </p>
                 </div>
                 <Button
@@ -1032,9 +923,24 @@ export default function App() {
                   disabled={!!busy || !state.connections.writable}
                   onClick={() => void propose("deploy_release")}
                 >
-                  انتشار نسخهٔ نمونه
+                  انتشار امن نسخهٔ تازه
                 </Button>
               </div>
+              <div className="care-deploy-path">
+                <span>۱. تأیید کد و هزینه</span>
+                <ArrowLeft size={15} />
+                <span>۲. نسخهٔ ایمنی</span>
+                <ArrowLeft size={15} />
+                <span>۳. انتشار</span>
+                <ArrowLeft size={15} />
+                <span>۴. دو آزمایش سفارش</span>
+              </div>
+              {state.actions
+                .filter((a) => a.kind === "deploy_release")
+                .slice(0, 3)
+                .map((a) => (
+                  <ActionProgress key={a.id} action={a} />
+                ))}
               <div className="panel">
                 <SectionHeading
                   title="تاریخچهٔ انتشارها"
@@ -1081,46 +987,23 @@ export default function App() {
           )}
           {page === "backups" && (
             <>
-              <div className="backup-overview">
-                <div className="panel backup-promise">
-                  <div className="backup-art">
-                    <HardDrive size={58} />
-                    <span>
-                      <ShieldCheck size={25} />
-                    </span>
-                  </div>
-                  <div>
-                    <Badge>یک راه برگشت داشته باشید</Badge>
-                    <h2>
-                      اطلاعاتتان ارزشمند است.
-                      <br />
-                      با خیال راحت نگهش دارید.
-                    </h2>
-                    <p>
-                      {state.mode === "demo"
-                        ? "پشتیبان‌های محلی از سفارش‌های واقعی فروشگاه آزمایشی تهیه می‌شوند."
-                        : "پشتیبان‌ها از دیتابیس تنظیم‌شده در لیارا دریافت می‌شوند؛ بازیابی ابری در این نسخه دستی است."}
-                    </p>
-                    <Button
-                      icon={Plus}
-                      variant="primary"
-                      disabled={!!busy || !state.connections.writable}
-                      onClick={() => void propose("create_backup")}
-                    >
-                      تهیهٔ نسخهٔ پشتیبان
-                    </Button>
-                  </div>
-                </div>
-                <div className="panel backup-stat">
-                  <ShieldCheck size={27} />
-                  <span>{fa(state.backups.length)}</span>
-                  <h3>نسخهٔ قابل مشاهده</h3>
+              <ProtectionPanel state={state} busy={!!busy} run={run} />
+              <div className="care-section-toolbar">
+                <div>
+                  <h2>یک راه برگشت، پیش از هر تغییر</h2>
                   <p>
-                    پیش از هر بازیابی محلی،
-                    <br />
-                    یک نسخهٔ ایمنی می‌گیرم.
+                    پیش از بازیابی، اثر آن را می‌بینید و یک نسخهٔ ایمنی تهیه
+                    می‌شود.
                   </p>
                 </div>
+                <Button
+                  icon={Plus}
+                  variant="primary"
+                  disabled={!!busy || !state.connections.writable}
+                  onClick={() => void propose("create_backup")}
+                >
+                  تهیهٔ پشتیبان
+                </Button>
               </div>
               <div className="panel">
                 <SectionHeading
@@ -1153,12 +1036,29 @@ export default function App() {
                             </td>
                             <td className="numeric">{b.size}</td>
                             <td>
-                              <Badge>آماده</Badge>
+                              <Badge
+                                tone={b.status === "ready" ? "green" : "amber"}
+                              >
+                                {b.verifiedAt
+                                  ? "ذخیره و آزمایش شد"
+                                  : b.status === "ready"
+                                    ? "فایل موجود است"
+                                    : "در حال آماده‌سازی"}
+                              </Badge>
+                              {b.orderCount !== undefined && (
+                                <small className="care-detail">
+                                  {fa(b.orderCount)} سفارش
+                                </small>
+                              )}
                             </td>
                             <td>
                               <Button
                                 icon={History}
-                                disabled={!!busy || b.source === "live"}
+                                disabled={
+                                  !!busy ||
+                                  !b.checksum ||
+                                  !state.care?.restoreAvailable
+                                }
                                 onClick={() =>
                                   void propose("restore_backup", b.id)
                                 }
@@ -1405,10 +1305,10 @@ export default function App() {
           </span>
         </div>
         <p className="modal-paragraph">
-          اتصال‌های دیتابیس فروشگاه آزمایشی را مشغول می‌کنیم تا ثبت سفارش خطا
-          بدهد. همراه پس از {fa(3)} بررسی ناموفق، مشکل را کشف می‌کند و برای
-          راه‌اندازی مجدد از شما تأیید می‌گیرد. سپس سلامت سایت و امکان ثبت سفارش
-          را می‌آزماید.
+          سایت باز می‌ماند، اما پردازشگر ثبت سفارش را در محیط تست متوقف می‌کنیم.
+          همراه با مشاهدهٔ شکست‌های پیاپی، مشکل را کشف می‌کند و برای راه‌اندازی
+          مجدد از شما تأیید می‌گیرد. سپس سلامت سایت و امکان ثبت سفارش را
+          می‌آزماید.
         </p>
         <div className="notice-banner">
           <Info size={18} />
@@ -1426,7 +1326,7 @@ export default function App() {
               run(
                 "fault",
                 async () => {
-                  await api("/demo/fault", { kind: "pool" });
+                  await api("/demo/fault", { kind: "checkout" });
                   setDemoOpen(false);
                   navigate("incidents");
                 },
@@ -1434,7 +1334,7 @@ export default function App() {
               )
             }
           >
-            شروع آزمایش اختلال
+            آزمایش خطای ثبت سفارش
           </Button>
           <Button
             icon={RefreshCw}
@@ -1745,10 +1645,47 @@ export default function App() {
                     <strong>{time(currentApproval.expiresAt)}</strong>
                   </div>
                 </div>
+                {!!currentApproval.steps?.length && (
+                  <ActionProgress action={currentApproval} />
+                )}
                 {state.mode === "demo" && (
                   <div className="demo-approval-note">
                     <Info size={16} />
                     این عملیات فقط در محیط آزمایشی اجرا می‌شود.
+                  </div>
+                )}
+                {currentApproval.kind === "restore_backup" && (
+                  <div className="care-restore-impact">
+                    <h3>بعد از بازیابی چه می‌شود؟</h3>
+                    <dl>
+                      <div>
+                        <dt>سفارش‌های فعلی</dt>
+                        <dd>
+                          {fa(currentApproval.params.currentCount || "0")}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>سفارش‌های نسخهٔ انتخابی</dt>
+                        <dd>{fa(currentApproval.params.backupCount || "0")}</dd>
+                      </div>
+                      <div>
+                        <dt>سفارش‌هایی که حذف می‌شوند</dt>
+                        <dd>
+                          {fa(currentApproval.params.removedCount || "0")}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt>سفارش‌هایی که جایگزین می‌شوند</dt>
+                        <dd>
+                          {fa(currentApproval.params.changedCount || "0")}
+                        </dd>
+                      </div>
+                    </dl>
+                    <p>
+                      ابتدا نسخهٔ ایمنی می‌گیریم. اگر سفارش‌ها از زمان بررسی
+                      تغییر کنند، بازیابی متوقف می‌شود. این پیش‌نمایش پنج دقیقه
+                      اعتبار دارد.
+                    </p>
                   </div>
                 )}
                 {currentApproval.kind === "restore_backup" && (

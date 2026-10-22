@@ -116,6 +116,7 @@ export class Liara {
       id: String(b.name),
       name: String(b.name),
       at: String(b.lastModified),
+      bytes: Number(b.size),
       size: `${(Number(b.size) / 1024 / 1024).toFixed(1)} MB`,
       status: "ready",
       source: "live",

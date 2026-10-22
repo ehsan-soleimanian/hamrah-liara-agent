@@ -1,0 +1,314 @@
+{
+  "generatedAt": "2026-10-22T18:24:48.483545+00:00",
+  "tests": {
+    "total": 84,
+    "passed": 84,
+    "failed": 0,
+    "command": "node --import tsx --test --test-concurrency=1 tests/*.test.ts",
+    "names": [
+      "probes verify both health and a real database write with rollback\r",
+      "monitor discovers fault without chat and waits for human approval\r",
+      "approval binds exact parameters, executes once, verifies business outcome\r",
+      "persistent failure is escalated and never falsely reported resolved\r",
+      "external recovery can be rechecked without falsely attributing a repair\r",
+      "backup restoration restores actual records and creates a safety snapshot\r",
+      "rejecting and expiring approvals cannot dispatch an operation\r",
+      "memory persists and uncertain operations are not replayed after restart\r",
+      "audit hash chain detects tampering\r",
+      "secrets are redacted from structured objects, URLs, logs and known env values\r",
+      "Liara adapter uses verified paths, authentication, denies unscoped writes\r",
+      "invalid state transitions cannot skip verification\r",
+      "HTTP 200 does not prove business success without ok:true\r",
+      "live mode fails closed for unsupported payment, restore and provisioning actions\r",
+      "checkout-only failure is discovered autonomously even while website is healthy; repair needs approval\r",
+      "backup is encrypted, independently read back, and dry-run restored without changing customer orders\r",
+      "restore preview reports orders at risk; a new order invalidates the approved replacement atomically\r",
+      "scope and preview expiry fail closed before a write\r",
+      "safe sample deployment creates verified safety backup, then checks orders twice; backup failure prevents release\r",
+      "scheduled protection requires explicit approval and does not create duplicate backups\r",
+      "paused or stale evidence cannot make the dashboard claim healthy; audit remains intact\r",
+      "uncertain native Liara backup submission is reconciled by reads without a repeated POST\r",
+      "connection checks send credentials only to fixed read endpoints and return no account data\r",
+      "missing keys never contact providers and service errors stay distinct without exposing their bodies\r",
+      "HTTP 200, a network error and a timeout cannot falsely confirm a connection\r",
+      "existing Liara clients use a replacement key and redact previous keys\r",
+      "all Liara calls bind the approved team via query, preserving existing parameters and never silently using a personal account\r",
+      "transient DNS failures retry reads once, expose only a safe code, and never replay writes\r",
+      "Cursor uses replacement keys immediately, redacts old keys and retains the last key if persistence fails\r",
+      "project review cannot invoke mutations or approval requests even if repository content asks\r",
+      "domain names and public probes reject URL tricks, private IPs and mapped addresses\r",
+      "three provider-derived records are required and unknown targets fail closed\r",
+      "manual flow requires two exact approvals, waits for DNS and verifies after SSL\r",
+      "Cloudflare key stays encrypted and writes only after exact DNS confirmation\r",
+      "DNS changed since review blocks all provider writes\r",
+      "DNS conflicts preserve mail records and show exact previous web records\r",
+      "expired approvals, account changes and retired apps cannot dispatch changes\r",
+      "crash recovery never blindly replays mutations and cancellation prevents checks\r",
+      "an uncertain SSL write is recorded before dispatch and is not replayed\r",
+      "a failed HTTPS recheck clears prior success and cannot leave a false active result\r",
+      "worker does not continue expired setup permissions\r",
+      "Liara DNS waits for public NS before any record or SSL write, then verifies outcome\r",
+      "Liara DNS adapter uses scoped official origin and verifies both provider status and public NS\r",
+      "Liara record diff supports apex ALIAS while preserving unrelated records\r",
+      "demo Liara path keeps the registrar handoff visible until the user confirms it\r",
+      "apex ALIAS leaves mandatory zone NS, SOA, MX and TXT intact\r",
+      "password protects health, state and memory exports\r",
+      "loopback API rejects foreign Host headers to prevent DNS rebinding\r",
+      "mutations reject missing client header and foreign origins\r",
+      "invalid chat input is rejected without adding a conversation message\r",
+      "responses apply security headers and never expose env credentials\r",
+      "mode changes reject invalid input, missing credentials and failed authentication\r",
+      "connection tests require dashboard authorization and do not save entered keys or alter mode and history\r",
+      "Liara key saves securely, survives restart and never reaches exports\r",
+      "Cursor keys save securely, replace without exposing values, persist after restart and preserve Liara and mode\r",
+      "stored-key connection tests use persisted credentials and return only safe results\r",
+      "switching with the stored key updates live events, persists mode, and preserves separate histories\r",
+      "transport refuses a foreign origin before transmitting credentials\r",
+      "transport never replays an uncertain write\r",
+      "owned PostgreSQL backup and isolated dry-run use read-back verification without deleting orders\r",
+      "PostgreSQL restore locks and compares current data before replacing, then verifies before commit\r",
+      "stale PostgreSQL approval and malformed snapshot roll back without deleting data\r",
+      "real ZIP analysis identifies dependencies and env NAMES without persisting credentials\r",
+      "invalid ZIP, traversal, Windows devices and oversized files fail closed\r",
+      "monorepo selection and missing startup produce actionable blockers\r",
+      "approval packages exact imported source, requires readiness, never runs user code in demo, and rejects tampering\r",
+      "GitHub import rejects non-GitHub destinations before network access\r",
+      "live deployment sends the approved project archive and waits for its exact release plus business verification\r",
+      "sample control credential is generated, encrypted and connected without asking the novice for an env value\r",
+      "catalog uses official resource and feature prices, excludes unknown or unavailable prices\r",
+      "vault ciphertext survives restart and authenticated encryption detects tampering\r",
+      "quote does not mutate cloud; approval binds exact inputs and secrets stay out of public memory\r",
+      "fresh pricing and source verification prevent unapproved spending\r",
+      "approved live workflow creates private services, preserves existing env, deploys exact release and verifies outcome\r",
+      "partial failure retains resource ledger and never repeats creation or deletes resources\r",
+      "missing business endpoint is explicitly unverified rather than claimed as a healthy business\r",
+      "public frontend variables cannot receive database secrets and connection passwords are URL encoded\r",
+      "demo completes the workflow without cloud writes or false live deployment claims\r",
+      "expired or tampered quotes cannot create resources\r",
+      "account changes invalidate spending approval but still allow cancelling a stale proposal\r",
+      "payment rejection is actionable and creates no paid resources; requote is read-only and preserves encrypted inputs\r",
+      "recovery never replays partially created paid resources or ambiguous failures\r",
+      "known source rejection can continue only deployment after a fresh approval, without recreating infrastructure\r",
+      "a slow cloud release can be rechecked without a new deploy or infrastructure mutation\r"
+    ]
+  },
+  "build": {
+    "passed": true,
+    "command": "npm run build"
+  },
+  "preview": {
+    "mode": "demo",
+    "health": "healthy",
+    "backupPolicy": {
+      "enabled": true,
+      "everyHours": 6,
+      "approvedAt": "2026-10-22T18:04:39.091Z"
+    },
+    "backups": [
+      {
+        "id": "beecf896-76ec-4f89-a133-fda098ef39c6",
+        "name": "نسخهٔ ایمنی پیش از انتشار",
+        "at": "2026-10-22T18:20:35.472Z",
+        "orderCount": 1,
+        "checksum": "3601fece5b2e746dd07ad5db6032511fd84771b2f4aa23d43f98adc53330d5d9",
+        "verifiedAt": "2026-10-22T18:20:35.472Z"
+      },
+      {
+        "id": "9b09eb6a-6212-40a0-af5a-5a440a380911",
+        "name": "نسخهٔ ایمنی پیش از بازیابی",
+        "at": "2026-10-22T18:03:28.652Z",
+        "orderCount": 2,
+        "checksum": "c99db322d7c58b51c144623b2773c3cd1af27e25e32d93e2b320195328ce0615",
+        "verifiedAt": "2026-10-22T18:03:28.652Z"
+      },
+      {
+        "id": "0882f2a6-dc44-4a4c-abd1-682d1338292f",
+        "name": "پشتیبان سفارش‌ها",
+        "at": "2026-10-22T18:02:10.883Z",
+        "orderCount": 1,
+        "checksum": "3601fece5b2e746dd07ad5db6032511fd84771b2f4aa23d43f98adc53330d5d9",
+        "verifiedAt": "2026-10-22T18:02:10.884Z"
+      }
+    ],
+    "incidents": [
+      {
+        "id": "c6e4107d-f8f4-4011-bff7-a9a9881ebdf2",
+        "status": "RESOLVED",
+        "verification": "بررسی سلامت و آزمایش ثبت سفارش هر دو موفق بودند. زمان پاسخ 11ms.",
+        "timeline": [
+          {
+            "status": "DETECTED",
+            "at": "2026-10-22T18:19:00.897Z",
+            "note": "اختلال توسط پایش مستقل شناسایی شد."
+          },
+          {
+            "status": "INVESTIGATING",
+            "at": "2026-10-22T18:19:00.914Z",
+            "note": "در حال جمع‌آوری لاگ و بررسی مسیر سفارش"
+          },
+          {
+            "status": "PLAN_READY",
+            "at": "2026-10-22T18:19:01.873Z",
+            "note": "راهکار با توجه به شواهد آماده شد."
+          },
+          {
+            "status": "AWAITING_APPROVAL",
+            "at": "2026-10-22T18:19:01.888Z",
+            "note": "برای «راه‌اندازی مجدد فروشگاه» منتظر تأیید شما هستم."
+          },
+          {
+            "status": "EXECUTING",
+            "at": "2026-10-22T18:20:11.707Z",
+            "note": "تأیید شما دریافت شد؛ در حال اجرا."
+          },
+          {
+            "status": "VERIFYING",
+            "at": "2026-10-22T18:20:11.782Z",
+            "note": "عملیات ارسال شد؛ اکنون نتیجهٔ واقعی را بررسی می‌کنم."
+          },
+          {
+            "status": "RESOLVED",
+            "at": "2026-10-22T18:20:12.836Z",
+            "note": "فروشگاه دوباره سالم است؛ مسیر ثبت سفارش هم تأیید شد."
+          }
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "id": "79b8eb4d-6f19-4e29-b222-66ead2f78542",
+        "kind": "deploy_release",
+        "status": "completed",
+        "createdAt": "2026-10-22T18:20:29.752Z",
+        "steps": [
+          {
+            "label": "تأیید شما و فروشگاه مقصد بررسی شد",
+            "status": "done",
+            "at": "2026-10-22T18:20:35.408Z"
+          },
+          {
+            "label": "در حال تهیهٔ نسخهٔ ایمنی پیش از انتشار",
+            "status": "running",
+            "at": "2026-10-22T18:20:35.422Z"
+          },
+          {
+            "label": "نسخهٔ ایمنی آماده است؛ انتشار می‌تواند شروع شود",
+            "status": "done",
+            "at": "2026-10-22T18:20:35.486Z"
+          },
+          {
+            "label": "در حال ارسال نسخهٔ تأییدشده",
+            "status": "running",
+            "at": "2026-10-22T18:20:35.497Z"
+          },
+          {
+            "label": "در حال بررسی سایت و ثبت سفارش در دو نوبت",
+            "status": "running",
+            "at": "2026-10-22T18:20:35.510Z"
+          },
+          {
+            "label": "دو بررسی پیاپی ثبت سفارش و سلامت سایت موفق بود",
+            "status": "done",
+            "at": "2026-10-22T18:20:36.496Z"
+          }
+        ]
+      },
+      {
+        "id": "29e109d2-2058-4f05-9a3c-105fe8984fea",
+        "kind": "restart_app",
+        "status": "completed",
+        "createdAt": "2026-10-22T18:19:01.871Z",
+        "steps": [
+          {
+            "label": "تأیید شما و فروشگاه مقصد بررسی شد",
+            "status": "done",
+            "at": "2026-10-22T18:20:11.739Z"
+          },
+          {
+            "label": "در حال بررسی سایت و ثبت سفارش در دو نوبت",
+            "status": "running",
+            "at": "2026-10-22T18:20:11.807Z"
+          },
+          {
+            "label": "دو بررسی پیاپی ثبت سفارش و سلامت سایت موفق بود",
+            "status": "done",
+            "at": "2026-10-22T18:20:12.817Z"
+          }
+        ]
+      },
+      {
+        "id": "ec36abf6-3edd-4763-a085-e63700b2e929",
+        "kind": "restore_backup",
+        "status": "completed",
+        "createdAt": "2026-10-22T18:03:17.011Z",
+        "steps": [
+          {
+            "label": "تأیید شما و فروشگاه مقصد بررسی شد",
+            "status": "done",
+            "at": "2026-10-22T18:03:28.585Z"
+          },
+          {
+            "label": "در حال تهیهٔ نسخهٔ ایمنی از سفارش‌های فعلی",
+            "status": "running",
+            "at": "2026-10-22T18:03:28.591Z"
+          },
+          {
+            "label": "نسخهٔ ایمنی ذخیره و آزمایش شد",
+            "status": "done",
+            "at": "2026-10-22T18:03:28.660Z"
+          },
+          {
+            "label": "سفارش‌های بازیابی‌شده با نسخهٔ انتخابی تطبیق داده شد",
+            "status": "done",
+            "at": "2026-10-22T18:03:28.690Z"
+          },
+          {
+            "label": "در حال بررسی سایت و ثبت سفارش در دو نوبت",
+            "status": "running",
+            "at": "2026-10-22T18:03:28.694Z"
+          },
+          {
+            "label": "دو بررسی پیاپی ثبت سفارش و سلامت سایت موفق بود",
+            "status": "done",
+            "at": "2026-10-22T18:03:29.637Z"
+          }
+        ]
+      },
+      {
+        "id": "8d90640d-c240-48ce-997a-ba85789644fa",
+        "kind": "create_backup",
+        "status": "completed",
+        "createdAt": "2026-10-22T18:02:06.497Z",
+        "steps": [
+          {
+            "label": "تأیید شما و فروشگاه مقصد بررسی شد",
+            "status": "done",
+            "at": "2026-10-22T18:02:10.819Z"
+          },
+          {
+            "label": "در حال تهیه و آزمایش نسخهٔ پشتیبان",
+            "status": "running",
+            "at": "2026-10-22T18:02:10.825Z"
+          },
+          {
+            "label": "ذخیره‌شدن نسخهٔ پشتیبان بررسی شد",
+            "status": "done",
+            "at": "2026-10-22T18:02:10.891Z"
+          }
+        ]
+      }
+    ]
+  },
+  "primary": {
+    "mode": "live",
+    "monitoring": false,
+    "listedApplications": 0,
+    "careAvailable": true
+  },
+  "newCloudResourcesCreated": false,
+  "limitations": [
+    "No fresh cloud deployment or real PostgreSQL run in this change; provider and SQL fixtures are distinct from live execution.",
+    "The sample recovery contract covers orders only, up to 10000 rows / 4 MB, stored encrypted on this device.",
+    "Mobile layout was observed initially; the browser tool did not consistently apply the requested 390px override, so a 390px visual pass is not claimed."
+  ]
+}

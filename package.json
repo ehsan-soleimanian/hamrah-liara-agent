@@ -11,7 +11,7 @@
     "build": "tsc --noEmit && vite build",
     "start": "tsx server/launcher.ts",
     "demo": "tsx demo/index.ts",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "tsx --test --test-concurrency=1 tests/*.test.ts",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write src server tests demo *.json *.ts *.yaml README.md docs/*.md"
   },

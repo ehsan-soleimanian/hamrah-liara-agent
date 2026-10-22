@@ -64,6 +64,11 @@ export interface Action {
   params: Record<string, string>;
   fingerprint: string;
   error?: string;
+  steps?: {
+    label: string;
+    at: string;
+    status: "running" | "done" | "failed";
+  }[];
 }
 export interface Service {
   id: string;
@@ -78,6 +83,7 @@ export interface Service {
   plan: string;
 }
 export interface Probe {
+  scope?: string;
   id: string;
   at: string;
   healthy: boolean;
@@ -105,12 +111,41 @@ export interface AuditEvent {
   hash: string;
 }
 export interface Backup {
+  bytes?: number;
   id: string;
   name: string;
   at: string;
   size: string;
   status: string;
   source: "demo" | "live";
+  checksum?: string;
+  orderCount?: number;
+  verifiedAt?: string;
+  scope?: string;
+  purpose?: string;
+}
+export interface RestorePreview {
+  backupId: string;
+  backupCount: number;
+  currentCount: number;
+  removedCount: number;
+  changedCount: number;
+  currentHash: string;
+  checksum: string;
+  at: string;
+  expiresAt: string;
+}
+export interface CareState {
+  websiteUrl?: string;
+  health: "healthy" | "unhealthy" | "unknown" | "stale" | "paused";
+  lastCheck?: string;
+  websiteOk?: boolean;
+  ordersOk?: boolean;
+  policy: { enabled: boolean; everyHours: number; approvedAt?: string };
+  nextBackupAt?: string;
+  backupError?: string;
+  lastBackup?: Backup;
+  restoreAvailable: boolean;
 }
 export interface Release {
   id: string;
@@ -126,6 +161,7 @@ export interface Settings {
   businessName: string;
 }
 export interface Snapshot {
+  care?: CareState;
   mode: "demo" | "live";
   managedAppId: string;
   agentProvider: "cursor" | "demo" | "unconfigured";

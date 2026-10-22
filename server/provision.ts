@@ -427,6 +427,14 @@ export class Provisioner {
           throw new ProvisionError("یک تنظیم به چند مقدار متصل شده است.");
         bound.add(env);
       }
+    // These credentials belong to the owned sample's machine control contract.
+    // Generate server-side; they never need to be copied by a novice user.
+    for (const env of project.envNames)
+      if (
+        ["HAMRAH_CONTROL_TOKEN", "TEST_CONTROL_TOKEN"].includes(env) &&
+        !input.env[env]
+      )
+        input.env[env] = randomUUID() + randomUUID();
     for (const env of project.envNames)
       if (!bound.has(env) && !input.env[env])
         throw new ProvisionError(

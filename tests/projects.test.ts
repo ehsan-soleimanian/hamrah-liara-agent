@@ -256,6 +256,19 @@ test("live deployment sends the approved project archive and waits for its exact
       sent = true;
       return { releaseID: "exact-release" };
     };
+    let safetyBackup = false;
+    engine.createBackup = async () => {
+      safetyBackup = true;
+      return {
+        id: "verified-test-backup",
+        name: "fixture",
+        at: new Date().toISOString(),
+        size: "1 KB",
+        status: "ready",
+        source: "live",
+        verifiedAt: new Date().toISOString(),
+      };
+    };
     engine.liara.call = async (endpoint) =>
       endpoint.includes("releases")
         ? {
@@ -284,6 +297,7 @@ test("live deployment sends the approved project archive and waits for its exact
     assert.equal(sent, false);
     await engine.decide(action.id, true, action.fingerprint);
     assert.equal(sent, true);
+    assert.equal(safetyBackup, true);
     assert.equal(checks, 2);
     assert.equal(db.get<any>("actions", action.id).status, "completed");
   } finally {
