@@ -4869,3 +4869,342 @@ td:last-child {
     min-height: 26px;
   }
 }
+/* Project intake keeps technical evidence available without crowding the main path. */
+.intake-steps {
+  list-style: none;
+  padding: 0;
+}
+.intake-steps li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  color: var(--text-muted, #8a9c98);
+  font-size: 13px;
+}
+.intake-steps li > span {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid #32433e;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.intake-steps li.done {
+  color: #9bdcc6;
+}
+.intake-steps li > i {
+  height: 1px;
+  background: #2c3b36;
+  flex: 1;
+  margin-inline: 12px;
+}
+.intake-source {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin: 28px 0;
+}
+.intake-source button {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 5px 12px;
+  text-align: start;
+  padding: 20px;
+  border: 1px solid #34423d;
+  border-radius: 16px;
+  background: #17201e;
+  color: #dce6e2;
+  min-height: 100px;
+}
+.intake-source button svg {
+  grid-row: span 2;
+  color: #97b5a8;
+}
+.intake-source button small {
+  color: #a1b2ab;
+}
+.intake-source button.selected {
+  background: #20382f;
+  border-color: #8ad4b6;
+  box-shadow: inset 0 0 0 1px #8ad4b6;
+}
+.intake-source button:disabled {
+  opacity: 0.6;
+}
+.intake-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 22px;
+  min-width: 0;
+}
+.intake-fields label {
+  display: grid;
+  gap: 10px;
+  color: #e1e9e6;
+  font-size: 14px;
+}
+.intake-fields input:not([type="file"]),
+.intake-fields select {
+  width: 100%;
+  min-height: 50px;
+  padding: 12px 14px;
+  border: 1px solid #3b4e46;
+  border-radius: 10px;
+  background: #101a17;
+  color: #e6eee9;
+  font: inherit;
+  box-sizing: border-box;
+}
+.intake-fields select {
+  cursor: pointer;
+}
+.intake-fields small,
+.intake-help,
+.intake-config small {
+  font-size: 12px;
+  color: #a6b9af;
+  line-height: 1.9;
+}
+.intake-upload {
+  border: 1px dashed #71ae95;
+  border-radius: 16px;
+  padding: 30px 20px;
+  text-align: center;
+  justify-items: center;
+  background: #182b23;
+  cursor: pointer;
+}
+.intake-upload svg {
+  color: #91d7b8;
+}
+.intake-upload span {
+  color: #a6b9af;
+  font-size: 12px;
+}
+.intake-upload input {
+  max-width: 100%;
+  font: inherit;
+  font-size: 13px;
+}
+.intake-advanced {
+  padding: 16px;
+  border: 1px solid #314339;
+  border-radius: 12px;
+}
+.intake-advanced label {
+  margin-top: 14px;
+}
+.intake-advanced summary,
+.intake-evidence summary {
+  cursor: pointer;
+  min-height: 28px;
+  color: #b7d0c2;
+}
+.intake-advanced p {
+  font-size: 12px;
+}
+.project-intake .notice-banner {
+  margin: 24px 0;
+  align-items: flex-start;
+}
+.project-intake .notice-banner svg {
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.intake-project-summary {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid #405d4d;
+  border-radius: 14px;
+  background: linear-gradient(110deg, #1c2c25, #1c3d2d);
+  margin: 24px 0;
+}
+.intake-project-summary > div {
+  flex: 1;
+  min-width: 0;
+}
+.intake-project-summary strong {
+  font-size: 21px;
+  display: block;
+}
+.intake-project-summary small {
+  display: block;
+  color: #b7cbbd;
+  font-size: 12px;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+.intake-evidence {
+  border-top: 1px solid #32433a;
+  padding: 18px 0;
+  font-size: 13px;
+}
+.intake-evidence summary span {
+  font-size: 11px;
+  margin-inline-start: 8px;
+  color: #9cae9f;
+}
+.intake-evidence ul,
+.intake-blockers ul {
+  padding-inline-start: 20px;
+  line-height: 2;
+}
+.intake-evidence li {
+  margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+.intake-evidence li code {
+  display: block;
+  color: #9dd9bb;
+  direction: ltr;
+  text-align: start;
+}
+.intake-evidence code {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.intake-evidence p {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.intake-blockers {
+  border: 1px solid #87694a;
+  background: #322c21;
+  border-radius: 14px;
+  padding: 20px;
+  color: #efd6ad;
+  margin: 24px 0;
+  font-size: 13px;
+}
+.intake-config,
+.intake-action,
+.intake-review {
+  border: 1px solid #344c3e;
+  border-radius: 14px;
+  padding: 22px;
+  margin: 24px 0;
+  background: #1a2b21;
+}
+.intake-config h3 {
+  font-size: 17px;
+  margin-top: 0;
+}
+.intake-config p,
+.intake-action p,
+.intake-review p {
+  font-size: 13px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.intake-env {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 14px 0;
+  direction: ltr;
+  justify-content: flex-end;
+}
+.intake-env code {
+  background: #101d17;
+  border: 1px solid #34503e;
+  padding: 6px 10px;
+  border-radius: 7px;
+  color: #b1e0c3;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.intake-ready {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  min-height: 48px;
+  margin: 20px 0 10px;
+  cursor: pointer;
+  line-height: 1.9;
+  font-size: 14px;
+}
+.intake-ready input {
+  width: 20px;
+  height: 20px;
+  accent-color: #8ad4b6;
+  flex-shrink: 0;
+}
+.intake-journey {
+  display: grid;
+  gap: 8px;
+  margin: 24px 0;
+}
+.intake-journey > div {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.intake-journey span {
+  width: 25px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #46604d;
+  border-radius: 50%;
+  font-size: 11px;
+  color: #a8d9bc;
+  flex-shrink: 0;
+}
+.intake-journey p {
+  margin: 0;
+  font-size: 12px;
+}
+.project-intake :focus-visible {
+  outline: 2px solid #a8e4c4;
+  outline-offset: 4px;
+}
+.project-intake h2:focus {
+  outline: none;
+}
+.project-intake button:disabled {
+  cursor: not-allowed;
+}
+@media (max-width: 600px) {
+  .intake-source {
+    gap: 10px;
+  }
+  .intake-source button {
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    font-size: 13px;
+  }
+  .intake-steps li {
+    gap: 5px;
+    font-size: 10px;
+  }
+  .intake-steps li > span {
+    width: 25px;
+    height: 25px;
+  }
+  .intake-steps li > i {
+    margin-inline: 5px;
+  }
+  .intake-project-summary {
+    gap: 10px;
+    padding: 14px;
+    flex-wrap: wrap;
+  }
+  .intake-project-summary strong {
+    font-size: 18px;
+  }
+  .intake-config {
+    padding: 16px;
+  }
+  .project-intake .wizard-buttons {
+    flex-wrap: wrap;
+  }
+}

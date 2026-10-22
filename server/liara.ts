@@ -108,10 +108,14 @@ export class Liara {
       }),
     );
   }
-  async deploy(app: string, archive: Buffer) {
+  async deploy(
+    app: string,
+    archive: Buffer,
+    options = { port: 3000, type: "docker" },
+  ) {
     this.assertWritable(app);
     const form = new FormData();
-    form.append("file", new Blob([new Uint8Array(archive)]), "golbazar.tar.gz");
+    form.append("file", new Blob([new Uint8Array(archive)]), "project.tar.gz");
     const source = await this.call(
       `/v2/projects/${safe(app)}/sources`,
       "POST",
@@ -120,8 +124,8 @@ export class Liara {
     if (!source.sourceID) throw new Error("لیارا شناسهٔ سورس را برنگرداند.");
     return this.call(`/v2/projects/${safe(app)}/releases`, "POST", {
       sourceID: source.sourceID,
-      port: 3000,
-      type: "docker",
+      port: options.port,
+      type: options.type,
     });
   }
   assertWritable(app: string) {

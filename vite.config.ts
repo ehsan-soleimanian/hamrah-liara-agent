@@ -6,6 +6,16 @@ export default defineConfig({
   server: {
     host: "127.0.0.1",
     port: 5173,
+    fs: {
+      deny: [
+        "**/.env",
+        "**/.env.*",
+        "**/*.{crt,pem}",
+        "**/.git/**",
+        "**/data/**",
+      ],
+    },
+    watch: { ignored: ["**/data/**"] },
     proxy: { "/api": "http://127.0.0.1:3001" },
   },
   build: {

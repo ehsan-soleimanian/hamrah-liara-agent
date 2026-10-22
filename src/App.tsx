@@ -345,13 +345,23 @@ export default function App() {
       setBusy("");
     }
   }
-  async function propose(kind: ActionKind, backupId?: string) {
+  async function propose(
+    kind: ActionKind,
+    backupId?: string,
+    projectId?: string,
+    dependenciesReady?: boolean,
+  ) {
     if (!state) return;
+    if (kind === "deploy_release" && !projectId) {
+      navigate("setup");
+      return;
+    }
     await run("propose", async () => {
       const a = await api<Action>("/actions", {
         kind,
         target: state.managedAppId,
         ...(backupId ? { backupId } : {}),
+        ...(projectId ? { projectId, dependenciesReady } : {}),
       });
       setApproval(a);
       setRestoreText("");
@@ -866,7 +876,9 @@ export default function App() {
           {page === "setup" && (
             <SetupPage
               state={state}
-              onDeploy={() => void propose("deploy_release")}
+              onDeploy={(projectId, ready) =>
+                void propose("deploy_release", undefined, projectId, ready)
+              }
             />
           )}{" "}
           {page === "services" && (

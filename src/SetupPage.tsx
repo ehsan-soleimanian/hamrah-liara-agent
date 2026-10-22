@@ -1,281 +1,602 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
   Check,
-  Cloud,
-  Code2,
+  FileArchive,
+  FileCode2,
   Flower2,
-  Globe,
+  Github,
   Info,
-  Layers,
-  Link2,
   LoaderCircle,
   Rocket,
-  ShoppingBag,
   ShieldCheck,
-  Store,
-  Terminal,
-  type LucideIcon,
+  UploadCloud,
 } from "lucide-react";
 import type { Snapshot } from "./types";
+import type { ProjectReport } from "./project-types";
 import { api, cn, fa } from "./lib";
+
 export default function SetupPage({
   state,
   onDeploy,
 }: {
   state: Snapshot;
-  onDeploy: () => void;
+  onDeploy: (projectId: string, ready: boolean) => void;
 }) {
   const [step, setStep] = useState(0);
-  const [kind, setKind] = useState("shop");
-  const [saving, setSaving] = useState(false);
+  const [source, setSource] = useState<"github" | "zip">("github");
+  const [url, setUrl] = useState("");
+  const [ref, setRef] = useState("");
+  const [root, setRoot] = useState("");
+  const [traffic, setTraffic] = useState("low");
+  const [file, setFile] = useState<File | null>(null);
+  const [report, setReport] = useState<ProjectReport | null>(null);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const kinds: {
-    id: string;
-    icon: LucideIcon;
-    label: string;
-    detail: string;
-  }[] = [
-    {
-      id: "shop",
-      icon: ShoppingBag,
-      label: "فروشگاه اینترنتی",
-      detail: "محصول، مشتری و سفارش",
-    },
-    {
-      id: "company",
-      icon: Globe,
-      label: "سایت معرفی کسب‌وکار",
-      detail: "یک حضور حرفه‌ای در وب",
-    },
-    {
-      id: "app",
-      icon: Layers,
-      label: "وب‌اپلیکیشن",
-      detail: "یک محصول با امکانات اختصاصی",
-    },
-  ];
-  async function next() {
+  const [ready, setReady] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/projects/active")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((p) => {
+        if (alive && p) {
+          setReport(p);
+          setRoot(p.root === "." ? "" : p.root);
+          setStep(1);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (alive) setLoaded(true);
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  function go(next: number) {
+    setStep(next);
     setError("");
-    setSaving(true);
+    setTimeout(() => heading.current?.focus(), 0);
+  }
+  async function analyze() {
+    setError("");
+    setBusy(true);
+    setReady(false);
     try {
-      await api("/setup/context", { projectType: kind });
-      setStep(1);
+      let result: ProjectReport;
+      if (source === "github")
+        result = await api<ProjectReport>("/projects/github", {
+          url,
+          ref,
+          root,
+          traffic,
+        });
+      else {
+        if (!file) throw new Error("ابتدا فایل ZIP پروژه را انتخاب کنید.");
+        if (file.size > 20 * 1024 * 1024)
+          throw new Error(
+            "فایل باید کمتر از ۲۰ مگابایت باشد؛ پوشهٔ node_modules را حذف کنید.",
+          );
+        const query = new URLSearchParams({ name: file.name, root, traffic });
+        const response = await fetch(`/api/projects/zip?${query}`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/zip",
+            "X-Hamrah-Client": "dashboard",
+          },
+          body: file,
+        });
+        const data = await response.json();
+        if (!response.ok)
+          throw new Error(data.error || "دریافت پروژه انجام نشد.");
+        result = data;
+      }
+      setReport(result);
+      go(1);
     } catch (e) {
       setError((e as Error).message);
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   }
+  const needsConfig = !!(report?.envNames.length || report?.services.length);
+  const action = state.actions.find((a) => a.params.projectId === report?.id);
   return (
-    <div className="setup-layout">
-      <div className="panel setup-main">
-        <div className="wizard-steps">
-          {["کسب‌وکار شما", "پیشنهاد همراه", "شروع انتشار"].map((label, i) => (
-            <div key={label} className={cn(i <= step && "done")}>
-              <span>{i < step ? <Check size={14} /> : fa(i + 1)}</span>
-              <strong>{label}</strong>
-              {i < 2 && <i />}
-            </div>
-          ))}
-        </div>
-        {step === 0 && (
-          <div className="wizard-content">
-            <span className="eyebrow">اول، کمی از شما بدانم</span>
-            <h2>چه چیزی می‌خواهید بسازید؟</h2>
-            <p>
-              لازم نیست از سرور و منابع بدانید. از نیاز کسب‌وکارتان شروع
-              می‌کنیم.
-            </p>
-            <div className="project-choices">
-              {kinds.map(({ id, icon: Icon, label, detail }) => (
-                <button
-                  key={id}
-                  className={cn("project-choice", kind === id && "selected")}
-                  onClick={() => setKind(id)}
-                  aria-pressed={kind === id}
+    <div className="setup-layout project-intake">
+      <section className="panel setup-main" aria-busy={busy}>
+        <ol className="wizard-steps intake-steps" aria-label="مراحل راه‌اندازی">
+          {["پروژهٔ شما", "تحلیل و پیشنهاد", "تأیید و انتشار"].map(
+            (label, i) => (
+              <li
+                key={label}
+                className={cn(i <= step && "done")}
+                aria-current={i === step ? "step" : undefined}
+              >
+                <span>{i < step ? <Check size={14} /> : fa(i + 1)}</span>
+                <strong>{label}</strong>
+                {i < 2 && <i />}
+              </li>
+            ),
+          )}
+        </ol>
+        <div className="wizard-content">
+          {step === 0 && (
+            <>
+              <span className="eyebrow">از کد شما شروع می‌کنیم</span>
+              <h2 ref={heading} tabIndex={-1}>
+                پروژه‌تان را به همراه بسپارید.
+              </h2>
+              <p>
+                لینک گیت‌هاب بدهید یا فایل پروژه را انتخاب کنید. همراه کد را
+                بررسی می‌کند و می‌گوید برای آنلاین‌شدن به چه چیزهایی نیاز دارید.
+              </p>
+              {!loaded ? (
+                <p role="status">در حال بازیابی پروژهٔ قبلی…</p>
+              ) : (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void analyze();
+                  }}
                 >
+                  <div
+                    className="intake-source"
+                    role="group"
+                    aria-label="روش دریافت پروژه"
+                  >
+                    <button
+                      type="button"
+                      disabled={busy}
+                      className={cn(source === "github" && "selected")}
+                      aria-pressed={source === "github"}
+                      onClick={() => {
+                        setSource("github");
+                        setError("");
+                      }}
+                    >
+                      <Github size={22} />
+                      <strong>لینک گیت‌هاب</strong>
+                      <small>بدون دانلود دستی</small>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      className={cn(source === "zip" && "selected")}
+                      aria-pressed={source === "zip"}
+                      onClick={() => {
+                        setSource("zip");
+                        setError("");
+                      }}
+                    >
+                      <FileArchive size={22} />
+                      <strong>فایل ZIP</strong>
+                      <small>از کامپیوتر شما</small>
+                    </button>
+                  </div>
+                  <fieldset disabled={busy} className="intake-fields">
+                    {source === "github" ? (
+                      <label htmlFor="project-url">
+                        آدرس مخزن گیت‌هاب
+                        <input
+                          id="project-url"
+                          type="url"
+                          dir="ltr"
+                          value={url}
+                          onChange={(e) => setUrl(e.target.value)}
+                          placeholder="https://github.com/you/your-project"
+                          required
+                          aria-describedby="repo-help intake-error"
+                        />
+                        <small id="repo-help">
+                          برای مخزن خصوصی، ZIP آپلود کنید یا GITHUB_TOKEN را در
+                          تنظیمات سرور بگذارید.
+                        </small>
+                      </label>
+                    ) : (
+                      <label className="intake-upload" htmlFor="project-zip">
+                        <UploadCloud size={32} />
+                        <strong>
+                          {file?.name || "فایل پروژه را انتخاب کنید"}
+                        </strong>
+                        <span>
+                          ZIP تا ۲۰ مگابایت · بدون node_modules و فایل‌های کلید
+                        </span>
+                        <input
+                          id="project-zip"
+                          type="file"
+                          accept=".zip,application/zip"
+                          required
+                          onChange={(e) => setFile(e.target.files?.[0] || null)}
+                          aria-describedby="intake-error"
+                        />
+                      </label>
+                    )}
+                    <label htmlFor="project-traffic">
+                      در شروع چقدر بازدید دارید؟
+                      <select
+                        id="project-traffic"
+                        value={traffic}
+                        onChange={(e) => setTraffic(e.target.value)}
+                      >
+                        <option value="low">
+                          تازه شروع می‌کنم یا بازدید کمی دارم
+                        </option>
+                        <option value="high">
+                          کاربر فعال زیاد دارم یا انتظار رشد سریع دارم
+                        </option>
+                      </select>
+                    </label>
+                    <details className="intake-advanced">
+                      <summary>تنظیمات اختیاری پروژه</summary>
+                      <p>
+                        اگر برنامه در پوشه‌ای داخل مخزن قرار دارد، نام آن را
+                        وارد کنید.
+                      </p>
+                      <label htmlFor="project-root">
+                        پوشهٔ برنامه
+                        <input
+                          id="project-root"
+                          dir="ltr"
+                          placeholder="apps/web"
+                          value={root}
+                          onChange={(e) => setRoot(e.target.value)}
+                        />
+                      </label>
+                      {source === "github" && (
+                        <label htmlFor="project-ref">
+                          شاخه، تگ یا نسخه
+                          <input
+                            id="project-ref"
+                            dir="ltr"
+                            placeholder="پیش‌فرض مخزن"
+                            value={ref}
+                            onChange={(e) => setRef(e.target.value)}
+                          />
+                        </label>
+                      )}
+                    </details>
+                  </fieldset>
+                  <div className="notice-banner">
+                    <ShieldCheck size={18} />
+                    <span>
+                      برای تحلیل، کد اجرا نمی‌شود. فایل‌های env و کلیدهای
+                      شناخته‌شده از انتشار حذف می‌شوند. تنها پروژه‌ای را منتشر
+                      کنید که به کدش اعتماد دارید.
+                    </span>
+                  </div>
+                  <button
+                    className="button primary"
+                    type="submit"
+                    disabled={busy}
+                  >
+                    {busy ? (
+                      <LoaderCircle className="spin" size={17} />
+                    ) : (
+                      <ArrowLeft size={17} />
+                    )}{" "}
+                    {busy
+                      ? "در حال دریافت و بررسی پروژه…"
+                      : "پروژه‌ام را بررسی کن"}
+                  </button>
+                  {busy && (
+                    <p role="status">
+                      دریافت سورس، بررسی وابستگی‌ها و آماده‌سازی پیشنهاد؛ ممکن
+                      است یک دقیقه طول بکشد.
+                    </p>
+                  )}
+                </form>
+              )}
+            </>
+          )}
+          {step === 1 && report && (
+            <>
+              <span className="eyebrow">پیشنهاد بر اساس فایل‌های واقعی</span>
+              <h2 ref={heading} tabIndex={-1}>
+                پروژه‌تان را شناختیم.
+              </h2>
+              <p>
+                برای «{report.name}» این مسیر را پیشنهاد می‌کنم. میزان دقیق
+                منابع پس از اجرا مشخص می‌شود.
+              </p>
+              <div className="intake-project-summary">
+                <span className="icon-tile green">
+                  <FileCode2 size={26} />
+                </span>
+                <div>
+                  <strong dir="auto">{report.stack}</strong>
+                  <small>
+                    {fa(report.fileCount)} فایل ·{" "}
+                    {report.source === "github" ? "GitHub" : "ZIP"} · پوشهٔ{" "}
+                    {report.root}
+                  </small>
+                </div>
+                <span className="badge green">تحلیل واقعی</span>
+              </div>
+              <div className="recommended-stack">
+                <div>
                   <span className="icon-tile green">
-                    <Icon size={23} />
+                    <Rocket size={22} />
                   </span>
                   <div>
-                    <strong>{label}</strong>
-                    <small>{detail}</small>
+                    <strong>میزبانی {report.stack}</strong>
+                    <p>{report.resources}</p>
+                    <small>
+                      روش انتشار: {report.platform || "نیاز به تکمیل"} · پورت{" "}
+                      {fa(report.port)}
+                    </small>
                   </div>
-                  <span className="radio-dot">{kind === id && <span />}</span>
-                </button>
-              ))}
-            </div>
-            <button
-              className="button primary"
-              onClick={() => void next()}
-              disabled={saving}
-            >
-              {saving ? <LoaderCircle size={16} /> : <ArrowLeft size={16} />}
-              پیشنهاد همراه را ببینید
-            </button>
-            {error && <p className="inline-error">{error}</p>}
-          </div>
-        )}
-        {step === 1 && (
-          <div className="wizard-content">
-            <span className="eyebrow">یک شروع کوچک، با جای رشد</span>
-            <h2>با ساده‌ترین زیرساخت شروع کنید.</h2>
-            <p>
-              پیشنهاد اولیه برای {kinds.find((k) => k.id === kind)?.label}{" "}
-              کم‌ترافیک است؛ انتخاب نهایی منابع به اجرای واقعی و اندازه‌گیری
-              مصرف بستگی دارد.
-            </p>
-            <div className="recommended-stack">
-              <div>
-                <span className="icon-tile green">
-                  <Globe size={22} />
-                </span>
-                <div>
-                  <strong>برنامهٔ وب</strong>
-                  <p>سورس نمونهٔ گل‌بازار، با Docker آمادهٔ انتشار است.</p>
                 </div>
-                <span className="badge green">ضروری</span>
+                {report.services.map((s) => (
+                  <div key={s.name}>
+                    <span className="icon-tile gray">
+                      <Check size={21} />
+                    </span>
+                    <div>
+                      <strong>{s.name}</strong>
+                      <p>{s.reason}</p>
+                    </div>
+                    <span className="badge amber">بررسی اتصال</span>
+                  </div>
+                ))}
               </div>
-              <div>
-                <span className="icon-tile green">
-                  <Store size={22} />
-                </span>
-                <div>
-                  <strong>پایگاه داده</strong>
-                  <p>
-                    برای فروشگاه واقعی، ذخیره‌سازی پایدار و پشتیبان لازم است؛
-                    نمونهٔ ابری فعلی حافظهٔ موقت دارد.
-                  </p>
+              {report.agentReview && (
+                <div className="intake-review">
+                  <Flower2 size={20} />
+                  <p>{report.agentReview}</p>
                 </div>
-                <span className="badge amber">پیش از استفادهٔ واقعی</span>
-              </div>
-              <div>
-                <span className="icon-tile gray">
-                  <Cloud size={22} />
-                </span>
-                <div>
-                  <strong>کش و سرویس‌های بیشتر</strong>
-                  <p>
-                    پس از مشاهدهٔ نیاز واقعی اضافه شوند؛ فعلاً لازم نیست هزینهٔ
-                    تازه‌ای بسازید.
-                  </p>
+              )}
+              {!!report.blockers.length && (
+                <div className="intake-blockers" role="alert">
+                  <strong>پیش از انتشار این موارد را کامل کنید</strong>
+                  <ul>
+                    {report.blockers.map((b) => (
+                      <li key={b}>{b}</li>
+                    ))}
+                  </ul>
+                  {report.candidates.length > 1 && (
+                    <p>
+                      پوشه‌های پیدا‌شده:{" "}
+                      <bdi>{report.candidates.join("، ")}</bdi>
+                    </p>
+                  )}
+                  <button className="text-button" onClick={() => go(0)}>
+                    انتخاب پوشه یا دریافت نسخهٔ اصلاح‌شده{" "}
+                    <ArrowLeft size={15} />
+                  </button>
                 </div>
-                <span className="badge gray">بعداً</span>
-              </div>
-            </div>
-            <div className="notice-banner">
-              <Info size={17} />
-              <span>
-                پلن و قیمت ساختگی پیشنهاد نمی‌کنیم. انتشار این MVP روی برنامهٔ
-                موجود در حساب شما انجام می‌شود؛ ساخت و خرید برنامهٔ جدید از پنل
-                لیارا انجام می‌شود.
-              </span>
-            </div>
-            <div className="wizard-buttons">
-              <button className="button primary" onClick={() => setStep(2)}>
-                ادامه به انتشار
-                <ArrowLeft size={16} />
-              </button>
-              <button className="text-button" onClick={() => setStep(0)}>
-                برگشت
-              </button>
-            </div>
-          </div>
-        )}
-        {step === 2 && (
-          <div className="wizard-content">
-            <span className="eyebrow">یک قدم تا دیدن نتیجه</span>
-            <h2>ایده‌تان را آنلاین کنید.</h2>
-            <p>
-              پیش از اجرا، مقصد و اثر انتشار را ببینید. پس از تأیید، همراه نتیجه
-              را بررسی می‌کند.
-            </p>
-            <div className="deploy-target">
-              <span className="icon-tile large green">
-                <Rocket size={31} />
-              </span>
-              <div>
-                <strong>
-                  {state.managedAppId || "برنامه هنوز انتخاب نشده"}
-                </strong>
+              )}
+              <details className="intake-evidence">
+                <summary>
+                  همراه از کجا فهمید؟{" "}
+                  <span>{fa(report.evidence.length)} شاهد</span>
+                </summary>
+                <ul>
+                  {report.evidence.map((e, i) => (
+                    <li key={i}>
+                      <code dir="ltr">{e.file}</code>
+                      <span>{e.finding}</span>
+                    </li>
+                  ))}
+                </ul>
                 <p>
-                  {state.mode === "demo"
-                    ? "مسیر انتشار نمایشی · فروشگاه واقعی محلی"
-                    : "اتصال واقعی لیارا · جایگزینی نسخهٔ فعلی"}
+                  نسخهٔ سورس: <code>{report.hash.slice(0, 16)}</code>
+                  {report.revision && (
+                    <>
+                      {" "}
+                      · Git commit: <code>{report.revision.slice(0, 12)}</code>
+                    </>
+                  )}
                 </p>
+                <p>
+                  محیط اجرا: {report.runtime} · ساخت:{" "}
+                  <bdi>{report.build || "طبق تنظیمات پروژه"}</bdi> · شروع:{" "}
+                  <bdi>{report.start || "نیاز به تکمیل"}</bdi>
+                </p>
+              </details>
+              {!!report.warnings.length && (
+                <details className="intake-evidence">
+                  <summary>نکات پیش از انتشار</summary>
+                  <ul>
+                    {report.warnings.map((w) => (
+                      <li key={w}>{w}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              <div className="wizard-buttons">
+                <button
+                  className="button primary"
+                  disabled={!!report.blockers.length}
+                  onClick={() => go(2)}
+                >
+                  ادامه به تنظیمات و انتشار <ArrowLeft size={17} />
+                </button>
+                <button className="text-button" onClick={() => go(0)}>
+                  تغییر پروژه
+                </button>
               </div>
-              <span className="badge gray">
-                {state.mode === "demo" ? "دمو" : "Liara"}
+            </>
+          )}
+          {step === 2 && report && (
+            <>
+              <span className="eyebrow">
+                شما تأیید می‌کنید؛ همراه پیگیری می‌کند
               </span>
-            </div>
-            <div className="setup-checklist">
-              <span>
-                <Check size={16} />
-                سورس نمونهٔ آماده
-              </span>
-              <span>
-                <ShieldCheck size={16} />
-                تأیید پیش از انتشار
-              </span>
-              <span>
-                <Check size={16} />
-                بررسی سلامت و مسیر سفارش
-              </span>
-            </div>
-            <button
-              className="button primary"
-              disabled={!state.connections.writable}
-              onClick={onDeploy}
-            >
-              <Rocket size={17} />
-              بررسی و تأیید انتشار
-            </button>
-            {!state.connections.writable && (
-              <p className="inline-error">
-                شناسهٔ برنامه و مجوز تغییر را در تنظیمات .env وارد کنید.
+              <h2 ref={heading} tabIndex={-1}>
+                آمادهٔ آنلاین‌شدن.
+              </h2>
+              <p>
+                همان نسخه‌ای که بررسی کردیم منتشر می‌شود. تغییر سورس، نیازمند
+                تحلیل و تأیید تازه است.
               </p>
-            )}
-            <button
-              className="text-button wizard-back"
-              onClick={() => setStep(1)}
-            >
-              برگشت به پیشنهاد
-            </button>
-          </div>
-        )}
-      </div>
+              <div className="deploy-target">
+                <span className="icon-tile green">
+                  <Rocket size={25} />
+                </span>
+                <div>
+                  <strong>
+                    {state.managedAppId || "مقصد انتشار تنظیم نشده"}
+                  </strong>
+                  <p>
+                    {state.mode === "demo"
+                      ? "دمو: فقط بسته‌بندی و پیش‌نمایش؛ پروژه اجرا نمی‌شود."
+                      : "لیارا: نسخهٔ فعلی این برنامه جایگزین خواهد شد."}
+                  </p>
+                </div>
+              </div>
+              {needsConfig && (
+                <div className="intake-config">
+                  <h3>چند تنظیم برای کارکرد درست پروژه</h3>
+                  <p>
+                    این موارد را در برنامهٔ مقصد در پنل لیارا تنظیم کنید. مقدار
+                    کلیدها را در چت یا فایل پروژه قرار ندهید.
+                  </p>
+                  {!!report.envNames.length && (
+                    <>
+                      <strong>نام تنظیمات شناسایی‌شده</strong>
+                      <div className="intake-env">
+                        {report.envNames.map((n) => (
+                          <code key={n}>{n}</code>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {!!report.services.length && (
+                    <p>
+                      اتصال‌های موردنیاز:{" "}
+                      {report.services.map((s) => s.name).join("، ")}.
+                    </p>
+                  )}
+                  <a
+                    href="https://console.liara.ir/"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-button"
+                  >
+                    بازکردن پنل لیارا <ArrowLeft size={14} />
+                  </a>
+                  <label className="intake-ready">
+                    <input
+                      type="checkbox"
+                      checked={ready}
+                      onChange={(e) => setReady(e.target.checked)}
+                    />
+                    <span>
+                      {state.mode === "demo"
+                        ? "می‌دانم تنظیمات و سرویس‌ها برای انتشار واقعی باید آماده باشند."
+                        : "تنظیمات و اتصال سرویس‌ها در برنامهٔ مقصد آماده است."}
+                    </span>
+                  </label>
+                  <small>
+                    درستی مقدار تنظیمات از روی نامشان قابل تضمین نیست؛ نتیجه پس
+                    از انتشار بررسی می‌شود.
+                  </small>
+                </div>
+              )}
+              <div className="notice-banner">
+                <Info size={18} />
+                <span>
+                  برنامهٔ مقصد باید از قبل با پلتفرم «{report.platform}» در
+                  لیارا وجود داشته باشد. ساخت برنامه و خرید دیتابیس خودکار انجام
+                  نمی‌شود. هزینه مطابق پلن حساب شماست.
+                </span>
+              </div>
+              {state.mode === "live" && (
+                <p className="intake-help">
+                  شناسهٔ مقصد و مجوز تغییر در تنظیمات سرور؛ آدرس سلامت و بررسی
+                  کسب‌وکار در APP_HEALTH_URL و APP_BUSINESS_CHECK_URL لازم‌اند.
+                </p>
+              )}
+              <button
+                className="button primary"
+                disabled={
+                  !state.connections.writable ||
+                  (needsConfig && !ready) ||
+                  action?.status === "executing"
+                }
+                onClick={() => onDeploy(report.id, ready)}
+              >
+                <ShieldCheck size={18} />
+                {state.mode === "demo"
+                  ? "بررسی و تأیید پیش‌نمایش"
+                  : "بررسی و تأیید انتشار"}
+              </button>
+              {!state.connections.writable && (
+                <p className="inline-error">
+                  مقصد انتشار و مجوز تغییر در تنظیمات اتصال سرور کامل نشده است.
+                </p>
+              )}
+              {action && (
+                <div className="intake-action" role="status">
+                  <strong>
+                    {
+                      {
+                        pending: "منتظر تأیید شما",
+                        executing: "در حال انتشار و بررسی نتیجه…",
+                        completed:
+                          state.mode === "demo"
+                            ? "پیش‌نمایش آماده شد؛ اجرای ابری انجام نشد"
+                            : "انتشار و بررسی موفق",
+                        failed: "انتشار به نتیجهٔ تأییدشده نرسید",
+                        rejected: "با تصمیم شما اجرا نشد",
+                        expired: "مهلت تأیید تمام شد",
+                        cancelled: "لغو شد",
+                      }[action.status]
+                    }
+                  </strong>
+                  <p>{action.error || action.description}</p>
+                </div>
+              )}
+              <button className="text-button wizard-back" onClick={() => go(1)}>
+                بازگشت به تحلیل
+              </button>
+            </>
+          )}
+          {error && (
+            <p id="intake-error" className="inline-error" role="alert">
+              {error}
+            </p>
+          )}
+        </div>
+      </section>
       <aside className="setup-aside">
         <div className="panel">
           <span className="agent-symbol">
-            <Flower2 size={23} />
+            <Flower2 size={25} />
           </span>
-          <h3>قرار نیست متخصص زیرساخت باشید.</h3>
+          <h3>یک پروژه، یک مسیر روشن.</h3>
           <p>
-            کافی‌ست بگویید چه می‌خواهید بسازید. همراه جزئیات و محدودیت‌ها را
-            توضیح می‌دهد و تصمیم‌های مهم را به شما می‌سپارد.
+            لازم نیست از سرور بدانید. همراه فایل‌ها را می‌خواند، نیازها را توضیح
+            می‌دهد و پیش از تغییر از شما اجازه می‌گیرد.
           </p>
+          <div className="intake-journey">
+            {[
+              "دریافت نسخهٔ مشخص از پروژه",
+              "تحلیل وابستگی‌ها و روش اجرا",
+              "پیشنهاد زیرساخت با شواهد",
+              "تأیید شما و بررسی نتیجه",
+            ].map((t, i) => (
+              <div key={t}>
+                <span>{fa(i + 1)}</span>
+                <p>{t}</p>
+              </div>
+            ))}
+          </div>
           <div className="setup-assurance">
-            <ShieldCheck size={17} />
-            شما همیشه کنترل را دارید.
+            <ShieldCheck size={18} /> کنترل همیشه دست شماست.
           </div>
         </div>
         <div className="panel domain-guide">
-          <Link2 size={22} />
-          <h3>دامنه هم دارید؟</h3>
+          <Info size={23} />
+          <h3>چه چیزهایی بررسی می‌شوند؟</h3>
           <p>
-            برای اتصال دامنه، رکورد DNS لازم را در پنل ثبت‌کننده تنظیم کنید.
-            ورود و تغییر در ایرنیک در این MVP دستی است.
+            فریم‌ورک، وابستگی‌ها، Dockerfile، نام تنظیمات و نشانه‌های دیتابیس و
+            کش. تحلیل ایستا تضمین اجرای بی‌خطا نیست؛ نتیجه پس از انتشار سنجیده
+            می‌شود.
           </p>
-          <a
-            className="text-button"
-            href="https://docs.liara.ir/paas/domains/add-domain/"
-            target="_blank"
-            rel="noreferrer"
-          >
-            راهنمای رسمی اتصال دامنه
-            <ArrowLeft size={13} />
-          </a>
+          <p>در حالت دمو هم کد واقعی بررسی می‌شود؛ بدون نیاز به کلید API.</p>
         </div>
       </aside>
     </div>
