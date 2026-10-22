@@ -13,6 +13,9 @@ import { redact } from "./security.ts";
 export class CursorBrain {
   private store: JsonlLocalAgentStore;
   private busy = false;
+  get isBusy() {
+    return this.busy;
+  }
   constructor(
     private db: Store,
     private customTools: Record<string, SDKCustomTool>,

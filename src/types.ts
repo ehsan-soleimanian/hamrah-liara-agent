@@ -138,7 +138,12 @@ export interface Snapshot {
   backups: Backup[];
   releases: Release[];
   settings: Settings;
-  connections: { liara: boolean; cursor: boolean; writable: boolean };
+  connections: {
+    liara: boolean;
+    cursor: boolean;
+    writable: boolean;
+    teamId?: string;
+  };
   monitor: {
     running: boolean;
     lastCheck?: string;
@@ -152,4 +157,5 @@ export interface Snapshot {
     reason?: string;
   }[];
   notices: string[];
+  provisionJobs?: import("./provision-types").ProvisionJob[];
 }

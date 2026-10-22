@@ -2,21 +2,28 @@ import { config } from "./config.ts";
 import { redact } from "./security.ts";
 import type { Service, Backup, Release } from "../src/types.ts";
 const safe = (s: string) => encodeURIComponent(s);
+export class LiaraError extends Error {
+  constructor(public status: number) {
+    super(`لیارا درخواست را نپذیرفت (HTTP ${status}).`);
+  }
+}
 export class Liara {
   constructor(
-    private token = config.liaraToken,
+    private token?: string,
     private request: typeof fetch = fetch,
+    private teamId = config.teamId,
   ) {}
   async call(endpoint: string, method = "GET", body?: unknown) {
-    if (!this.token) throw new Error("کلید API لیارا در .env تنظیم نشده است.");
+    const token = this.token ?? config.liaraToken;
+    if (!token) throw new Error("کلید API لیارا را در تنظیمات وارد کنید.");
     const response = await this.request(`https://api.liara.ir${endpoint}`, {
       method,
       headers: {
-        Authorization: `Bearer ${this.token}`,
+        Authorization: `Bearer ${token}`,
         ...(body instanceof FormData
           ? {}
           : { "Content-Type": "application/json" }),
-        ...(config.teamId ? { "x-team-id": config.teamId } : {}),
+        ...(this.teamId ? { "x-team-id": this.teamId } : {}),
       },
       body:
         body instanceof FormData
@@ -27,10 +34,7 @@ export class Liara {
       signal: AbortSignal.timeout(20000),
       redirect: "error",
     });
-    if (!response.ok)
-      throw new Error(
-        `Liara HTTP ${response.status}: ${redact(await response.text()).slice(0, 600)}`,
-      );
+    if (!response.ok) throw new LiaraError(response.status);
     const text = await response.text();
     return text ? JSON.parse(text) : {};
   }

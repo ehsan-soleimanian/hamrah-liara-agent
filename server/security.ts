@@ -1,4 +1,8 @@
 import { createHash, timingSafeEqual } from "node:crypto";
+const runtimeSecrets = new Set<string>();
+export function registerSecrets(values: string[]) {
+  for (const value of values) if (value.length > 3) runtimeSecrets.add(value);
+}
 export function redact(value: unknown): string {
   let text =
     (typeof value === "string"
@@ -18,6 +22,8 @@ export function redact(value: unknown): string {
     if (secret && secret.length > 5)
       text = text.split(secret).join("[REDACTED]");
   }
+  for (const value of runtimeSecrets)
+    text = text.split(value).join("[REDACTED]");
   return text
     .replace(/(Bearer\s+)[\w.\-]+/gi, "$1[REDACTED]")
     .replace(

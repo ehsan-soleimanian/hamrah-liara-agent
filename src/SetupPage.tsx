@@ -15,14 +15,9 @@ import {
 import type { Snapshot } from "./types";
 import type { ProjectReport } from "./project-types";
 import { api, cn, fa } from "./lib";
+import ProvisionFlow from "./ProvisionFlow";
 
-export default function SetupPage({
-  state,
-  onDeploy,
-}: {
-  state: Snapshot;
-  onDeploy: (projectId: string, ready: boolean) => void;
-}) {
+export default function SetupPage({ state }: { state: Snapshot }) {
   const [step, setStep] = useState(0);
   const [source, setSource] = useState<"github" | "zip">("github");
   const [url, setUrl] = useState("");
@@ -33,7 +28,6 @@ export default function SetupPage({
   const [report, setReport] = useState<ProjectReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [ready, setReady] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -63,7 +57,6 @@ export default function SetupPage({
   async function analyze() {
     setError("");
     setBusy(true);
-    setReady(false);
     try {
       let result: ProjectReport;
       if (source === "github")
@@ -101,8 +94,6 @@ export default function SetupPage({
       setBusy(false);
     }
   }
-  const needsConfig = !!(report?.envNames.length || report?.services.length);
-  const action = state.actions.find((a) => a.params.projectId === report?.id);
   return (
     <div className="setup-layout project-intake">
       <section className="panel setup-main" aria-busy={busy}>
@@ -421,136 +412,9 @@ export default function SetupPage({
           )}
           {step === 2 && report && (
             <>
-              <span className="eyebrow">
-                شما تأیید می‌کنید؛ همراه پیگیری می‌کند
-              </span>
-              <h2 ref={heading} tabIndex={-1}>
-                آمادهٔ آنلاین‌شدن.
-              </h2>
-              <p>
-                همان نسخه‌ای که بررسی کردیم منتشر می‌شود. تغییر سورس، نیازمند
-                تحلیل و تأیید تازه است.
-              </p>
-              <div className="deploy-target">
-                <span className="icon-tile green">
-                  <Rocket size={25} />
-                </span>
-                <div>
-                  <strong>
-                    {state.managedAppId || "مقصد انتشار تنظیم نشده"}
-                  </strong>
-                  <p>
-                    {state.mode === "demo"
-                      ? "دمو: فقط بسته‌بندی و پیش‌نمایش؛ پروژه اجرا نمی‌شود."
-                      : "لیارا: نسخهٔ فعلی این برنامه جایگزین خواهد شد."}
-                  </p>
-                </div>
-              </div>
-              {needsConfig && (
-                <div className="intake-config">
-                  <h3>چند تنظیم برای کارکرد درست پروژه</h3>
-                  <p>
-                    این موارد را در برنامهٔ مقصد در پنل لیارا تنظیم کنید. مقدار
-                    کلیدها را در چت یا فایل پروژه قرار ندهید.
-                  </p>
-                  {!!report.envNames.length && (
-                    <>
-                      <strong>نام تنظیمات شناسایی‌شده</strong>
-                      <div className="intake-env">
-                        {report.envNames.map((n) => (
-                          <code key={n}>{n}</code>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                  {!!report.services.length && (
-                    <p>
-                      اتصال‌های موردنیاز:{" "}
-                      {report.services.map((s) => s.name).join("، ")}.
-                    </p>
-                  )}
-                  <a
-                    href="https://console.liara.ir/"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-button"
-                  >
-                    بازکردن پنل لیارا <ArrowLeft size={14} />
-                  </a>
-                  <label className="intake-ready">
-                    <input
-                      type="checkbox"
-                      checked={ready}
-                      onChange={(e) => setReady(e.target.checked)}
-                    />
-                    <span>
-                      {state.mode === "demo"
-                        ? "می‌دانم تنظیمات و سرویس‌ها برای انتشار واقعی باید آماده باشند."
-                        : "تنظیمات و اتصال سرویس‌ها در برنامهٔ مقصد آماده است."}
-                    </span>
-                  </label>
-                  <small>
-                    درستی مقدار تنظیمات از روی نامشان قابل تضمین نیست؛ نتیجه پس
-                    از انتشار بررسی می‌شود.
-                  </small>
-                </div>
-              )}
-              <div className="notice-banner">
-                <Info size={18} />
-                <span>
-                  برنامهٔ مقصد باید از قبل با پلتفرم «{report.platform}» در
-                  لیارا وجود داشته باشد. ساخت برنامه و خرید دیتابیس خودکار انجام
-                  نمی‌شود. هزینه مطابق پلن حساب شماست.
-                </span>
-              </div>
-              {state.mode === "live" && (
-                <p className="intake-help">
-                  شناسهٔ مقصد و مجوز تغییر در تنظیمات سرور؛ آدرس سلامت و بررسی
-                  کسب‌وکار در APP_HEALTH_URL و APP_BUSINESS_CHECK_URL لازم‌اند.
-                </p>
-              )}
-              <button
-                className="button primary"
-                disabled={
-                  !state.connections.writable ||
-                  (needsConfig && !ready) ||
-                  action?.status === "executing"
-                }
-                onClick={() => onDeploy(report.id, ready)}
-              >
-                <ShieldCheck size={18} />
-                {state.mode === "demo"
-                  ? "بررسی و تأیید پیش‌نمایش"
-                  : "بررسی و تأیید انتشار"}
-              </button>
-              {!state.connections.writable && (
-                <p className="inline-error">
-                  مقصد انتشار و مجوز تغییر در تنظیمات اتصال سرور کامل نشده است.
-                </p>
-              )}
-              {action && (
-                <div className="intake-action" role="status">
-                  <strong>
-                    {
-                      {
-                        pending: "منتظر تأیید شما",
-                        executing: "در حال انتشار و بررسی نتیجه…",
-                        completed:
-                          state.mode === "demo"
-                            ? "پیش‌نمایش آماده شد؛ اجرای ابری انجام نشد"
-                            : "انتشار و بررسی موفق",
-                        failed: "انتشار به نتیجهٔ تأییدشده نرسید",
-                        rejected: "با تصمیم شما اجرا نشد",
-                        expired: "مهلت تأیید تمام شد",
-                        cancelled: "لغو شد",
-                      }[action.status]
-                    }
-                  </strong>
-                  <p>{action.error || action.description}</p>
-                </div>
-              )}
+              <ProvisionFlow state={state} report={report} />
               <button className="text-button wizard-back" onClick={() => go(1)}>
-                بازگشت به تحلیل
+                بازگشت به تحلیل پروژه
               </button>
             </>
           )}

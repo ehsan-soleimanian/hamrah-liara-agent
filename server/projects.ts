@@ -119,7 +119,7 @@ export async function readZip(buffer: Buffer): Promise<Map<string, Buffer>> {
     );
   });
 }
-function hashFiles(files: Map<string, Buffer>) {
+export function hashFiles(files: Map<string, Buffer>) {
   const h = createHash("sha256");
   for (const [name, bytes] of [...files].sort(([a], [b]) =>
     a.localeCompare(b),
@@ -324,6 +324,17 @@ export function analyzeFiles(
       continue;
     // Credential files only contribute variable NAMES, never values or raw text.
     const content = bytes.toString("utf8");
+    const healthRoute = content.match(
+      /\.get\(\s*['"](\/(?:health|healthz|api\/health))['"]/,
+    );
+    const businessRoute = content.match(
+      /\.get\(\s*['"](\/api\/[a-zA-Z0-9_/-]+\/(?:check|verify))['"]/,
+    );
+    if (healthRoute || businessRoute)
+      report.checks = {
+        healthPath: healthRoute?.[1] || report.checks?.healthPath || "/",
+        businessPath: businessRoute?.[1] || report.checks?.businessPath || "",
+      };
     if (secret.test(name)) {
       for (const match of content.matchAll(/^\s*([A-Z][A-Z0-9_]{1,79})\s*=/gm))
         envNames.add(match[1]);

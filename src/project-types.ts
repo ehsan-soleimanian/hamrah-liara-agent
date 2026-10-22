@@ -1,4 +1,5 @@
 export interface ProjectReport {
+  checks?: { healthPath: string; businessPath: string };
   id: string;
   name: string;
   source: "zip" | "github";

@@ -4,16 +4,30 @@ import { rateLimit } from "express-rate-limit";
 import path from "node:path";
 import { existsSync } from "node:fs";
 import { z } from "zod";
-import { config } from "./config.ts";
+import { config, saveLiaraToken, saveCursorKey } from "./config.ts";
 import { Store } from "./store.ts";
 import { Engine } from "./engine.ts";
 import { redact, secureEqual } from "./security.ts";
 import { Projects } from "./projects.ts";
 import type { ProjectReport } from "../src/project-types.ts";
-const db = new Store(path.join(config.dataDir, config.mode));
-const engine = new Engine(db);
-const projects = new Projects(db);
+import { Vault } from "./vault.ts";
+import { Provisioner } from "./provision.ts";
+import {
+  restoreConnection,
+  restoreManaged,
+  copyProjectSnapshot,
+} from "./connection.ts";
+import { registerSecrets } from "./security.ts";
+import { modeRuntime } from "./runtime-mode.ts";
+import { testConnection, ConnectionTestError } from "./connection-test.ts";
+const vault = new Vault(config.dataDir);
+restoreConnection(vault);
+let db = new Store(path.join(config.dataDir, config.mode));
+let engine = new Engine(db);
+let projects = new Projects(db);
+let provisioner = new Provisioner(db, engine, vault);
 let importing = false;
+let switching = false;
 const app = express();
 app.disable("x-powered-by");
 app.use(
@@ -33,6 +47,15 @@ app.use(
   }),
 );
 app.use((req, res, next) => {
+  if (["127.0.0.1", "localhost", "::1"].includes(config.host)) {
+    const hostname = req.hostname?.toLowerCase();
+    if (!["127.0.0.1", "localhost", "::1", "[::1]"].includes(hostname || "")) {
+      res
+        .status(403)
+        .json({ error: "میزبان درخواست برای سرویس محلی مجاز نیست." });
+      return;
+    }
+  }
   if (config.password) {
     const auth = req.headers.authorization || "";
     let password = "";
@@ -72,7 +95,16 @@ app.use((req, res, next) => {
   }
   next();
 });
-app.use(express.json({ limit: "32kb" }));
+app.use(express.json({ limit: "128kb" }));
+app.use((req, res, next) => {
+  if (switching && req.method !== "GET") {
+    res
+      .status(409)
+      .json({ error: "اتصال حساب در حال تغییر است؛ کمی صبر کنید." });
+    return;
+  }
+  next();
+});
 app.use(
   "/api",
   rateLimit({
@@ -83,10 +115,161 @@ app.use(
     skip: (req) => req.path === "/events",
   }),
 );
+app.use("/api", (_req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  next();
+});
 app.get("/api/health", (_req, res) =>
   res.json({ ok: true, mode: config.mode }),
 );
 app.get("/api/state", (_req, res) => res.json(engine.snapshot()));
+app.post("/api/connection", async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  const parsed = z
+    .object({
+      mode: z.enum(["demo", "live"]),
+      liaraToken: z
+        .string()
+        .trim()
+        .max(8192)
+        .regex(/^[\x21-\x7e]*$/)
+        .optional(),
+      cursorKey: z.string().trim().max(4096).optional(),
+      teamId: z.string().trim().max(100).optional(),
+    })
+    .strict()
+    .parse(req.body);
+  const input = {
+    mode: parsed.mode,
+    liaraToken: parsed.liaraToken || config.liaraToken,
+    cursorKey: parsed.cursorKey ?? config.cursorKey,
+    teamId: parsed.teamId ?? config.teamId,
+  };
+  if (
+    engine.executing ||
+    provisioner.busy ||
+    importing ||
+    engine.probing ||
+    engine.refreshing ||
+    engine.brain.isBusy
+  )
+    throw new Error("منتظر پایان بررسی یا عملیات جاری بمانید.");
+  const previous = {
+    mode: config.mode,
+    intervalMs: config.intervalMs,
+    liaraToken: config.liaraToken,
+    cursorKey: config.cursorKey,
+    teamId: config.teamId,
+    appId: config.appId,
+    databaseId: config.databaseId,
+    allowedApps: config.allowedApps,
+    healthUrl: config.healthUrl,
+    businessUrl: config.businessUrl,
+  };
+  let committed = false;
+  let nextDb: Store | undefined;
+  switching = true;
+  engine.stop();
+  try {
+    if (input.mode === "live") {
+      if (!input.liaraToken) throw new Error("کلید اتصال لیارا را وارد کنید.");
+      try {
+        await new (await import("./liara.ts")).Liara(
+          input.liaraToken,
+          fetch,
+          input.teamId,
+        ).call("/v1/me");
+      } catch {
+        throw new Error(
+          "اتصال به حساب لیارا تأیید نشد؛ کلید، دسترسی تیم و شبکه را بررسی کنید.",
+        );
+      }
+    }
+    await modeRuntime.prepare(input.mode);
+    const activeId = db.value("activeProjectId", "");
+    const active = activeId ? projects.get(activeId) : null;
+    const source = active ? projects.base(active.id) : null;
+    nextDb = new Store(path.join(config.dataDir, input.mode));
+    if (active && source) {
+      copyProjectSnapshot(
+        source,
+        path.join(config.dataDir, input.mode, "projects", active.id),
+      );
+      nextDb.put("projects", active);
+      nextDb.set("activeProjectId", active.id);
+    }
+    vault.put("connection", input);
+    Object.assign(config, input, {
+      appId: "",
+      databaseId: "",
+      allowedApps: [],
+      healthUrl: "",
+      businessUrl: "",
+      intervalMs:
+        input.mode === "live"
+          ? Math.max(60000, Number(process.env.MONITOR_INTERVAL_MS) || 60000)
+          : Math.max(2000, Number(process.env.MONITOR_INTERVAL_MS) || 5000),
+    });
+    registerSecrets([input.liaraToken, input.cursorKey]);
+    restoreManaged(vault);
+    const nextEngine = new Engine(nextDb);
+    const nextProvisioner = new Provisioner(nextDb, nextEngine, vault);
+    nextDb.audit(
+      "settings",
+      "حالت همراه تغییر کرد",
+      input.mode === "live" ? "اتصال واقعی فعال شد." : "حالت نمایشی فعال شد.",
+      "user",
+    );
+    nextEngine.listeners = engine.listeners;
+    const oldDb = db;
+    db = nextDb;
+    engine = nextEngine;
+    projects = new Projects(db);
+    provisioner = nextProvisioner;
+    committed = true;
+    oldDb.close();
+    engine.start();
+    engine.emit();
+    res.json({
+      ok: true,
+      mode: config.mode,
+      liaraConnected: !!config.liaraToken,
+      cursorConnected: !!config.cursorKey,
+    });
+  } catch (error) {
+    if (!committed) {
+      Object.assign(config, previous);
+      nextDb?.close();
+      vault.put("connection", previous);
+    }
+    throw error;
+  } finally {
+    if (!committed) engine.start();
+    switching = false;
+  }
+});
+app.get("/api/provision/catalog", async (_req, res) =>
+  res.json(await provisioner.catalog()),
+);
+app.get("/api/provision/jobs", (req, res) => {
+  const id = z.string().uuid().parse(req.query.projectId);
+  res.json(provisioner.list(id));
+});
+app.get("/api/provision/:id/logs", async (req, res) =>
+  res.json(await provisioner.logs(req.params.id)),
+);
+app.post("/api/provision/quote", async (req, res) =>
+  res.json(await provisioner.quote(req.body)),
+);
+app.post("/api/provision/:id/decision", async (req, res) => {
+  const input = z
+    .object({ fingerprint: z.string().length(64), approve: z.boolean() })
+    .strict()
+    .parse(req.body);
+  res.json(
+    await provisioner.approve(req.params.id, input.fingerprint, input.approve),
+  );
+});
 app.get("/api/events", (req, res) => {
   res.set({
     "Content-Type": "text/event-stream",
@@ -147,6 +330,128 @@ app.post("/api/demo/fault", async (req, res) => {
     .strict()
     .parse(req.body);
   await engine.demoFault(kind);
+  res.json({ ok: true });
+});
+app.post(
+  "/api/settings/:provider/test",
+  rateLimit({
+    windowMs: 60000,
+    limit: 20,
+    legacyHeaders: false,
+    message: { error: "تعداد تست‌های اتصال زیاد است؛ یک دقیقه صبر کنید." },
+  }),
+  async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    const provider = z.enum(["liara", "cursor"]).parse(req.params.provider);
+    const { token } = z
+      .object({
+        token: z
+          .string()
+          .trim()
+          .min(1)
+          .max(provider === "liara" ? 8192 : 4096)
+          .regex(/^[\x21-\x7e]+$/)
+          .optional(),
+      })
+      .strict()
+      .parse(req.body ?? {});
+    const source = token === undefined ? "saved" : "entered";
+    const key =
+      token ?? (provider === "liara" ? config.liaraToken : config.cursorKey);
+    try {
+      const result = await testConnection(provider, key, config.teamId);
+      res.json({ ...result, source });
+    } catch (error) {
+      if (!(error instanceof ConnectionTestError)) throw error;
+      res.status(error.status).json({ error: error.message });
+    }
+  },
+);
+app.post("/api/settings/liara", (req, res) => {
+  res.set("Cache-Control", "no-store");
+  const { token } = z
+    .object({
+      token: z
+        .string()
+        .trim()
+        .min(1)
+        .max(8192)
+        .regex(/^[\x21-\x7e]+$/),
+    })
+    .strict()
+    .parse(req.body);
+  if (
+    engine.executing ||
+    provisioner.busy ||
+    importing ||
+    engine.probing ||
+    engine.refreshing ||
+    engine.brain.isBusy
+  ) {
+    res.status(409).json({
+      error: "منتظر پایان بررسی یا عملیات جاری بمانید و دوباره ذخیره کنید.",
+    });
+    return;
+  }
+  try {
+    saveLiaraToken(token);
+  } catch {
+    res.status(500).json({
+      error:
+        "ذخیرهٔ کلید انجام نشد؛ دسترسی نوشتن در پوشهٔ داده‌های سرور را بررسی کنید.",
+    });
+    return;
+  }
+  db.audit(
+    "settings",
+    "کلید اتصال لیارا ذخیره شد",
+    "کلید محرمانه به‌روزرسانی شد.",
+    "user",
+  );
+  engine.emit();
+  res.json({ ok: true });
+  void engine.refresh();
+});
+app.post("/api/settings/cursor", (req, res) => {
+  res.set("Cache-Control", "no-store");
+  const { token } = z
+    .object({
+      token: z
+        .string()
+        .trim()
+        .min(1)
+        .max(4096)
+        .regex(/^[\x21-\x7e]+$/),
+    })
+    .strict()
+    .parse(req.body);
+  if (
+    engine.executing ||
+    provisioner.busy ||
+    importing ||
+    engine.brain.isBusy
+  ) {
+    res.status(409).json({
+      error: "منتظر پایان بررسی یا عملیات جاری بمانید و دوباره ذخیره کنید.",
+    });
+    return;
+  }
+  try {
+    saveCursorKey(token);
+  } catch {
+    res.status(500).json({
+      error:
+        "ذخیرهٔ کلید انجام نشد؛ دسترسی نوشتن در پوشهٔ داده‌های سرور را بررسی کنید.",
+    });
+    return;
+  }
+  db.audit(
+    "settings",
+    "کلید اتصال Cursor ذخیره شد",
+    "کلید محرمانه به‌روزرسانی شد.",
+    "user",
+  );
+  engine.emit();
   res.json({ ok: true });
 });
 app.patch("/api/settings", (req, res) => {
@@ -272,6 +577,7 @@ app.get("/api/memory/export", (_req, res) => {
       exportedAt: new Date().toISOString(),
       messages: state.messages,
       projects: db.list("projects"),
+      provisionJobs: db.list("provisionJobs"),
       incidents: state.incidents,
       actions: state.actions,
       audit: state.audit,
@@ -305,7 +611,9 @@ app.use(
       .json({
         error:
           (error as { type?: string }).type === "entity.too.large"
-            ? "حجم فایل بیشتر از ۲۰ مگابایت است؛ پوشه‌های وابستگی و build را حذف کنید."
+            ? _req.path === "/api/projects/zip"
+              ? "حجم فایل بیشتر از ۲۰ مگابایت است؛ پوشه‌های وابستگی و build را حذف کنید."
+              : "حجم اطلاعات درخواست زیاد است؛ تعداد یا طول تنظیمات را کم کنید."
             : error instanceof z.ZodError
               ? "اطلاعات درخواست معتبر نیست."
               : redact(error.message),

@@ -873,14 +873,7 @@ export default function App() {
               </div>
             </>
           )}
-          {page === "setup" && (
-            <SetupPage
-              state={state}
-              onDeploy={(projectId, ready) =>
-                void propose("deploy_release", undefined, projectId, ready)
-              }
-            />
-          )}{" "}
+          {page === "setup" && <SetupPage state={state} />}{" "}
           {page === "services" && (
             <>
               <div className="info-line">
@@ -2335,6 +2328,206 @@ function MemoryPage({ state }: { state: Snapshot }) {
     </>
   );
 }
+function ConnectionTestControl({
+  provider,
+  token,
+  configured,
+  busy,
+  run,
+}: {
+  provider: "liara" | "cursor";
+  token: string;
+  configured: boolean;
+  busy: string;
+  run: (
+    key: string,
+    task: () => Promise<unknown>,
+    message?: string,
+  ) => Promise<void>;
+}) {
+  const [result, setResult] = useState<{ ok: boolean; message: string } | null>(
+    null,
+  );
+  const label = provider === "liara" ? "لیارا" : "Cursor";
+  const taskKey = `test-${provider}`;
+  useEffect(() => {
+    setResult(null);
+  }, [token, configured]);
+  async function test() {
+    if (busy) return;
+    setResult(null);
+    await run(taskKey, async () => {
+      try {
+        const checked = await api<{
+          message: string;
+          checkedAt: string;
+          source: "saved" | "entered";
+        }>(
+          `/settings/${provider}/test`,
+          token.trim() ? { token: token.trim() } : {},
+        );
+        setResult({
+          ok: true,
+          message: `${checked.message} (${checked.source === "saved" ? "کلید ذخیره‌شده" : "کلید واردشده"}، ساعت ${time(checked.checkedAt)})`,
+        });
+      } catch (error) {
+        setResult({ ok: false, message: (error as Error).message });
+        throw error;
+      }
+    });
+  }
+  return (
+    <>
+      <Button
+        icon={busy === taskKey ? LoaderCircle : Activity}
+        disabled={!!busy || (!configured && !token.trim())}
+        onClick={() => void test()}
+      >
+        {busy === taskKey ? "در حال تست اتصال…" : `تست اتصال ${label}`}
+      </Button>
+      <p
+        id={`${provider}-test-result`}
+        className={cn(
+          "connection-test-result",
+          result && (result.ok ? "liara-key-status" : "liara-key-error"),
+        )}
+        role="status"
+        aria-atomic="true"
+      >
+        {busy === taskKey ? `در حال بررسی اتصال به ${label}…` : result?.message}
+      </p>
+    </>
+  );
+}
+function CursorKeyForm({
+  configured,
+  busy,
+  run,
+  demo,
+}: {
+  configured: boolean;
+  busy: string;
+  run: (
+    key: string,
+    task: () => Promise<unknown>,
+    message?: string,
+  ) => Promise<void>;
+  demo: boolean;
+}) {
+  const [key, setKey] = useState("");
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+  const input = useRef<HTMLInputElement>(null);
+  const validate = (value: string) =>
+    !value.trim()
+      ? "کلید Cursor را وارد کنید."
+      : !/^[\x21-\x7e]{1,4096}$/.test(value.trim())
+        ? "کلید را بدون فاصله و با حروف و اعداد انگلیسی وارد کنید."
+        : "";
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    const validation = validate(key);
+    setError(validation);
+    setSaved(false);
+    if (validation) {
+      input.current?.focus();
+      return;
+    }
+    await run("cursor-key", async () => {
+      try {
+        await api("/settings/cursor", { token: key.trim() });
+        setKey("");
+        setSaved(true);
+      } catch (error) {
+        setError((error as Error).message);
+        input.current?.focus();
+        throw error;
+      }
+    });
+  }
+  return (
+    <form
+      className="liara-key-form"
+      onSubmit={submit}
+      aria-busy={busy === "cursor-key"}
+      noValidate
+    >
+      <label className="field" htmlFor="cursor-api-key">
+        <span>{configured ? "جایگزینی کلید Cursor" : "کلید API Cursor"}</span>
+        <input
+          ref={input}
+          id="cursor-api-key"
+          type="password"
+          dir="ltr"
+          autoComplete="new-password"
+          spellCheck={false}
+          autoCapitalize="none"
+          maxLength={4096}
+          required
+          value={key}
+          disabled={!!busy}
+          placeholder={
+            configured
+              ? "کلید جدید Cursor را وارد کنید"
+              : "کلید Cursor را اینجا بچسبانید"
+          }
+          aria-invalid={!!error}
+          aria-describedby={`cursor-key-help${error ? " cursor-key-error" : ""}`}
+          onBlur={() => {
+            if (key) setError(validate(key));
+          }}
+          onChange={(e) => {
+            setKey(e.target.value);
+            setError("");
+            setSaved(false);
+          }}
+        />
+      </label>
+      <p id="cursor-key-help">
+        کلید به‌صورت رمزگذاری‌شده روی همین سرور ذخیره می‌شود، دوباره نمایش داده
+        نمی‌شود و از درخواست بعدی بدون راه‌اندازی مجدد استفاده خواهد شد.
+      </p>
+      {error && (
+        <p id="cursor-key-error" className="liara-key-error" role="alert">
+          {error}
+        </p>
+      )}
+      <div className="secret-key-actions">
+        <Button
+          type="submit"
+          variant="primary"
+          icon={busy === "cursor-key" ? LoaderCircle : LockKeyhole}
+          disabled={!!busy}
+        >
+          {busy === "cursor-key" ? "در حال ذخیره…" : "ذخیرهٔ کلید Cursor"}
+        </Button>
+        <ConnectionTestControl
+          provider="cursor"
+          token={key}
+          configured={configured}
+          busy={busy}
+          run={run}
+        />
+      </div>
+      <p>
+        کادر خالی باشد، کلید ذخیره‌شده تست می‌شود؛ تست اتصال، کلید جدید را ذخیره
+        نمی‌کند و مدل را اجرا نمی‌کند.
+      </p>
+      <p role="status" className="liara-key-status">
+        {saved
+          ? "کلید Cursor ذخیره شد. برای بررسی اعتبار آن، تست اتصال را بزنید."
+          : ""}
+      </p>
+      {demo && (
+        <p>
+          گفتگو در حالت نمایشی با پاسخ‌های نمونه انجام می‌شود؛ برای تحلیل واقعی،
+          حالت «واقعی» را انتخاب کنید.
+        </p>
+      )}
+    </form>
+  );
+}
 function SettingsPage({
   state,
   busy,
@@ -2349,13 +2542,156 @@ function SettingsPage({
   ) => Promise<void>;
 }) {
   const [name, setName] = useState(state.settings.businessName);
+  const [liaraToken, setLiaraToken] = useState("");
+  const [tokenError, setTokenError] = useState("");
+  const [tokenSaved, setTokenSaved] = useState(false);
+  const [selectedMode, setSelectedMode] = useState(state.mode);
+  const [modeError, setModeError] = useState("");
+  const [modeSaved, setModeSaved] = useState("");
+  useEffect(() => {
+    setSelectedMode(state.mode);
+  }, [state.mode]);
+  const tokenInput = useRef<HTMLInputElement>(null);
+  const validateToken = (value: string) => {
+    const token = value.trim();
+    return !token
+      ? "کلید لیارا را وارد کنید."
+      : !/^[\x21-\x7e]{1,8192}$/.test(token)
+        ? "کلید را بدون فاصله و با حروف و اعداد انگلیسی وارد کنید."
+        : "";
+  };
+  async function submitLiaraToken(e: FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    const error = validateToken(liaraToken);
+    setTokenError(error);
+    setTokenSaved(false);
+    if (error) {
+      tokenInput.current?.focus();
+      return;
+    }
+    await run("liara-token", async () => {
+      try {
+        await api("/settings/liara", { token: liaraToken.trim() });
+        setLiaraToken("");
+        setTokenSaved(true);
+      } catch (error) {
+        setTokenError((error as Error).message);
+        tokenInput.current?.focus();
+        throw error;
+      }
+    });
+  }
+  async function submitMode(e: FormEvent) {
+    e.preventDefault();
+    if (busy || selectedMode === state.mode) return;
+    setModeError("");
+    setModeSaved("");
+    if (selectedMode === "live" && !state.connections.liara) {
+      setModeError("ابتدا کلید لیارا را در کادر پایین وارد و ذخیره کنید.");
+      tokenInput.current?.focus();
+      return;
+    }
+    await run("mode", async () => {
+      try {
+        const result = await api<{ mode: Snapshot["mode"] }>("/connection", {
+          mode: selectedMode,
+        });
+        setModeSaved(
+          result.mode === "live"
+            ? "حالت واقعی فعال و ذخیره شد."
+            : "حالت نمایشی فعال و ذخیره شد.",
+        );
+      } catch (error) {
+        setModeError((error as Error).message);
+        throw error;
+      }
+    });
+  }
   return (
     <div className="settings-layout">
       <div className="panel settings-panel">
         <SectionHeading
           title="اتصال‌های همراه"
-          subtitle="کلیدهای محرمانه فقط از فایل .env خوانده می‌شوند و به مرورگر ارسال نمی‌شوند."
+          subtitle="کلیدهای لیارا و Cursor را همین‌جا ذخیره کنید؛ مقادیر ذخیره‌شده دوباره نمایش داده نمی‌شوند."
         />
+        <form
+          className="liara-key-form mode-form"
+          onSubmit={submitMode}
+          aria-busy={busy === "mode"}
+        >
+          <fieldset disabled={!!busy} aria-describedby="mode-help mode-current">
+            <legend>حالت اجرای همراه</legend>
+            <div className="mode-options">
+              {(
+                [
+                  {
+                    value: "demo",
+                    label: "نمایشی (دمو)",
+                    description: "آزمایش با داده‌های نمونه",
+                  },
+                  {
+                    value: "live",
+                    label: "واقعی",
+                    description: "اتصال به حساب لیارا",
+                  },
+                ] as const
+              ).map(({ value, label, description }) => (
+                <label
+                  key={value}
+                  className={cn(
+                    "mode-option",
+                    selectedMode === value && "selected",
+                  )}
+                >
+                  <input
+                    type="radio"
+                    name="app-mode"
+                    value={value}
+                    checked={selectedMode === value}
+                    onChange={() => {
+                      setSelectedMode(value);
+                      setModeError("");
+                      setModeSaved("");
+                    }}
+                  />
+                  <span>
+                    <strong>{label}</strong>
+                    <small>{description}</small>
+                  </span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          <p id="mode-current">
+            حالت فعلی: {state.mode === "live" ? "واقعی" : "نمایشی"}
+          </p>
+          <p id="mode-help">
+            برای حالت واقعی از کلید ذخیره‌شدهٔ لیارا استفاده می‌شود. حالت
+            انتخابی بدون راه‌اندازی مجدد اعمال می‌شود و پس از بستن برنامه باقی
+            می‌ماند. تاریخچهٔ هر حالت جداست.
+          </p>
+          {modeError && (
+            <p className="liara-key-error" role="alert">
+              {modeError}
+            </p>
+          )}
+          <Button
+            type="submit"
+            variant="primary"
+            icon={busy === "mode" ? LoaderCircle : RefreshCw}
+            disabled={!!busy || selectedMode === state.mode}
+          >
+            {busy === "mode"
+              ? selectedMode === "live"
+                ? "در حال بررسی اتصال…"
+                : "در حال تغییر حالت…"
+              : "ذخیرهٔ حالت"}
+          </Button>
+          <p className="liara-key-status" role="status">
+            {modeSaved}
+          </p>
+        </form>
         {[
           {
             label: "زیرساخت لیارا",
@@ -2386,26 +2722,112 @@ function SettingsPage({
             </Badge>
           </div>
         ))}
+        <form
+          className="liara-key-form"
+          onSubmit={submitLiaraToken}
+          aria-busy={busy === "liara-token"}
+          noValidate
+        >
+          <label className="field" htmlFor="liara-api-token">
+            <span>
+              {state.connections.liara
+                ? "جایگزینی کلید لیارا"
+                : "کلید API لیارا"}
+            </span>
+            <input
+              ref={tokenInput}
+              id="liara-api-token"
+              type="password"
+              dir="ltr"
+              autoComplete="new-password"
+              spellCheck={false}
+              autoCapitalize="none"
+              maxLength={8192}
+              required
+              value={liaraToken}
+              disabled={!!busy}
+              placeholder={
+                state.connections.liara
+                  ? "کلید جدید را وارد کنید"
+                  : "کلید لیارا را اینجا بچسبانید"
+              }
+              aria-invalid={!!tokenError}
+              aria-describedby={`liara-key-help${tokenError ? " liara-key-error" : ""}`}
+              onBlur={() => {
+                if (liaraToken) setTokenError(validateToken(liaraToken));
+              }}
+              onChange={(e) => {
+                setLiaraToken(e.target.value);
+                setTokenError("");
+                setTokenSaved(false);
+              }}
+            />
+          </label>
+          <p id="liara-key-help">
+            کلید به‌صورت رمزگذاری‌شده روی همین سرور ذخیره می‌شود و بدون
+            راه‌اندازی مجدد قابل استفاده است.
+          </p>
+          {tokenError && (
+            <p id="liara-key-error" className="liara-key-error" role="alert">
+              {tokenError}
+            </p>
+          )}
+          <div className="secret-key-actions">
+            <Button
+              type="submit"
+              variant="primary"
+              icon={busy === "liara-token" ? LoaderCircle : LockKeyhole}
+              disabled={!!busy}
+            >
+              {busy === "liara-token" ? "در حال ذخیره…" : "ذخیرهٔ کلید لیارا"}
+            </Button>
+            <ConnectionTestControl
+              provider="liara"
+              token={liaraToken}
+              configured={state.connections.liara}
+              busy={busy}
+              run={run}
+            />
+          </div>
+          <p>
+            کادر خالی باشد، کلید ذخیره‌شده تست می‌شود؛ تست اتصال، کلید جدید را
+            ذخیره نمی‌کند.
+          </p>
+          <p role="status" className="liara-key-status">
+            {tokenSaved
+              ? "کلید لیارا ذخیره شد. برای بررسی اعتبار آن، تست اتصال را بزنید."
+              : ""}
+          </p>
+          {state.mode === "demo" && (
+            <p>
+              حالت نمایشی فعال است؛ ذخیرهٔ کلید، حالت برنامه را تغییر نمی‌دهد.
+            </p>
+          )}
+        </form>
+        <CursorKeyForm
+          configured={state.connections.cursor}
+          busy={busy}
+          run={run}
+          demo={state.mode === "demo"}
+        />
         <div className="env-guide">
           <strong>
             <Terminal size={16} />
             راه‌اندازی اتصال واقعی
           </strong>
           <ol>
+            <li>کلید لیارا را در کادر بالا وارد و ذخیره کنید.</li>
             <li>
-              فایل <code>.env.example</code> را به <code>.env</code> کپی کنید.
+              «واقعی» را در بخش حالت اجرای همراه انتخاب کنید و «ذخیرهٔ حالت» را
+              بزنید؛ اتصال حساب پیش از تغییر حالت بررسی می‌شود.
             </li>
             <li>
-              کلیدهای لیارا و Cursor را وارد کنید؛ <code>APP_MODE=live</code>{" "}
-              بگذارید.
+              از «راه‌اندازی آسان» برای تنظیم برنامه و زیرساخت کسب‌وکارتان
+              استفاده کنید.
             </li>
             <li>
-              نام برنامه، مجوز تغییر و آدرس‌های بررسی سلامت و مسیر اصلی را تنظیم
-              کنید.
-            </li>
-            <li>
-              سرویس را دوباره اجرا کنید؛ تاریخچهٔ دمو از داده‌های واقعی جدا نگه
-              داشته می‌شود.
+              کلید Cursor را در کادر بالا وارد و ذخیره کنید؛ نیازی به تغییر فایل
+              تنظیمات یا راه‌اندازی مجدد نیست.
             </li>
           </ol>
           <p>
@@ -2457,7 +2879,7 @@ function SettingsPage({
             <LockKeyhole size={17} />
           </span>
           <div>
-            <strong>پرداخت و ویرایش آزاد کد</strong>
+            <strong>شارژ بانکی و ویرایش آزاد کد</strong>
             <p>در این نسخه دسترسی ندارد</p>
           </div>
           <Badge tone="gray">بسته</Badge>

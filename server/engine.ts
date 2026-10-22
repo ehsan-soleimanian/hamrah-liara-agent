@@ -59,6 +59,8 @@ export class Engine {
   listeners = new Set<() => void>();
   probing = false;
   executing = false;
+  refreshing = false;
+  initialTimer?: ReturnType<typeof setTimeout>;
   timer?: ReturnType<typeof setInterval>;
   lastCheck?: string;
   failures = 0;
@@ -127,6 +129,7 @@ export class Engine {
                 probes: db.list<Probe>("probes").slice(0, 8),
                 messages: db.list<Message>("messages").slice(0, 12),
                 audit: db.auditList().slice(0, 12),
+                setup: db.list("provisionJobs").slice(0, 5),
               }),
             },
           ],
@@ -340,34 +343,39 @@ export class Engine {
     return this.services;
   }
   async refresh() {
-    this.notices = [];
+    this.refreshing = true;
     try {
-      await this.loadServices();
-    } catch (error) {
-      this.notices.push(redact((error as Error).message));
-    }
-    if (config.mode === "live" && config.liaraToken) {
-      for (const [collection, read] of [
-        ["backups", () => this.liara.backups()],
-        [
-          "releases",
-          () =>
-            config.appId
-              ? this.liara.releases(config.appId)
-              : Promise.resolve([]),
-        ],
-      ] as const) {
-        try {
-          const items = await read();
-          this.db.set(`${collection}Cache`, items);
-        } catch (error) {
-          this.notices.push(
-            `${collection}: ${redact((error as Error).message)}`,
-          );
+      this.notices = [];
+      try {
+        await this.loadServices();
+      } catch (error) {
+        this.notices.push(redact((error as Error).message));
+      }
+      if (config.mode === "live" && config.liaraToken) {
+        for (const [collection, read] of [
+          ["backups", () => this.liara.backups()],
+          [
+            "releases",
+            () =>
+              config.appId
+                ? this.liara.releases(config.appId)
+                : Promise.resolve([]),
+          ],
+        ] as const) {
+          try {
+            const items = await read();
+            this.db.set(`${collection}Cache`, items);
+          } catch (error) {
+            this.notices.push(
+              `${collection}: ${redact((error as Error).message)}`,
+            );
+          }
         }
       }
+      this.emit();
+    } finally {
+      this.refreshing = false;
     }
-    this.emit();
   }
   async logs() {
     return config.mode === "demo"
@@ -1145,7 +1153,7 @@ export class Engine {
     if (config.mode === "live") {
       this.message(
         "assistant",
-        "برای تحلیل گفتگو، CURSOR_API_KEY را در فایل .env قرار دهید و سرویس را دوباره اجرا کنید. داده‌ها و تاریخچه حفظ می‌شوند.",
+        "برای تحلیل گفتگو، کلید Cursor را در صفحهٔ تنظیمات و اتصال‌ها وارد و ذخیره کنید. نیازی به راه‌اندازی مجدد نیست؛ داده‌ها و تاریخچه حفظ می‌شوند.",
         "system",
       );
       return;
@@ -1233,6 +1241,7 @@ export class Engine {
           : this.db.value("releasesCache", []),
       settings: this.settings(),
       connections: {
+        teamId: config.teamId,
         liara: !!config.liaraToken,
         cursor: !!config.cursorKey,
         writable:
@@ -1262,7 +1271,7 @@ export class Engine {
         },
         {
           key: "deploy",
-          label: "انتشار سورس نمونه با تأیید",
+          label: "انتشار سورس پروژه با تأیید",
           available:
             config.mode === "demo" || config.allowedApps.includes(config.appId),
         },
@@ -1275,10 +1284,15 @@ export class Engine {
         },
         {
           key: "billing",
-          label: "پرداخت و خرید سرویس",
+          label: "شارژ حساب و پرداخت بانکی",
           available: false,
           reason:
-            "درگاه پرداخت یا API خرید یک‌کلیکی متصل نیست؛ هیچ مبلغی برداشت نمی‌شود.",
+            "ساخت سرویس با تأیید هزینه از اعتبار لیارا مصرف می‌کند؛ درگاه شارژ بانکی در این نسخه متصل نیست.",
+        },
+        {
+          key: "provision",
+          label: "ساخت برنامه، دیتابیس و اتصال تنظیمات با تأیید هزینه",
+          available: config.mode === "demo" || !!config.liaraToken,
         },
         {
           key: "code",
@@ -1289,6 +1303,7 @@ export class Engine {
         },
       ],
       notices: this.notices,
+      provisionJobs: this.db.list("provisionJobs"),
     };
   }
   start() {
@@ -1299,9 +1314,13 @@ export class Engine {
         this.emit();
       });
     }, config.intervalMs);
-    setTimeout(() => void this.tick(), 1500);
+    this.initialTimer = setTimeout(
+      () => void this.tick().catch(() => {}),
+      1500,
+    );
   }
   stop() {
+    if (this.initialTimer) clearTimeout(this.initialTimer);
     if (this.timer) clearInterval(this.timer);
   }
 }
