@@ -143,7 +143,7 @@ export class Liara {
           (r.gitInfo as Record<string, unknown> | undefined)?.message ||
             "انتشار لیارا",
         ),
-        at: String(r.created_at || ""),
+        at: String(r.createdAt || r.created_at || ""),
         status: String(r.state || "unknown"),
         source: "live",
       }),

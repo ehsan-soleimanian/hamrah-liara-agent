@@ -269,14 +269,25 @@ test("live deployment sends the approved project archive and waits for its exact
         verifiedAt: new Date().toISOString(),
       };
     };
-    engine.liara.call = async (endpoint) =>
-      endpoint.includes("releases")
-        ? {
-            currentRelease: "exact-release",
-            releases: [{ _id: "exact-release", state: "ready" }],
-          }
-        : {};
+    let releaseReads = 0;
+    engine.liara.call = async (endpoint) => {
+      if (!endpoint.includes("releases")) return {};
+      releaseReads++;
+      return {
+        currentRelease: "exact-release",
+        releases: [
+          {
+            _id: "exact-release",
+            state: releaseReads === 1 ? "BUILDING" : "READY",
+          },
+        ],
+      };
+    };
     engine.check = async () => {
+      assert.ok(
+        releaseReads >= 2,
+        "health must not verify the previous process while the selected release is still building",
+      );
       checks++;
       return {
         id: String(checks),

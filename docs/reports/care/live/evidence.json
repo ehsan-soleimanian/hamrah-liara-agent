@@ -1,0 +1,1030 @@
+{
+  "recordedAt": "2026-10-22T19:45:51.449979+00:00",
+  "run": {
+    "runId": "e32bf34b-48fc-4094-be65-3d07a9624185",
+    "startedAt": "2026-10-22T18:58:04.251Z",
+    "cleanedAt": "2026-10-22T19:39:01.041Z",
+    "appName": "gb-care-mvjwlsgo",
+    "dbName": "gb-care-db-mvjwlsgo",
+    "databaseId": "6ada5d18fc09ae5c3cb330ae",
+    "sourceHash": "19b10a5455cbafd29f7bc272139b639aa24b85c294d198f09f18901878ea1776",
+    "hourlyEstimate": 2083.3288888888887,
+    "balanceBefore": 1998854.2,
+    "balanceAfter": 1997708.4,
+    "observedBalanceDelta": 1145.8000000000466
+  },
+  "cleanup": {
+    "at": "2026-10-22T19:40:59.207Z",
+    "remainingApps": [],
+    "remainingDatabases": [],
+    "remainingNetworks": [
+      {
+        "id": "6ada0991215dadb3a758935b",
+        "name": "golbazar-hamrah-1022-net"
+      }
+    ],
+    "balance": 1997708.4,
+    "runtime": {
+      "mode": "live",
+      "managedAppId": "",
+      "monitoring": false,
+      "backupSchedule": false
+    }
+  },
+  "initialChecks": {
+    "at": "2026-10-22T19:04:49.784Z",
+    "health": {
+      "status": 200,
+      "data": {
+        "ok": true,
+        "service": "golbazar",
+        "database": "postgresql",
+        "startedAt": "2026-10-22T19:01:15.151Z"
+      }
+    },
+    "business": {
+      "status": 200,
+      "data": {
+        "ok": true,
+        "check": "postgres-order-write-read-rollback",
+        "persisted": false
+      }
+    },
+    "unauthorizedBackupStatus": 401,
+    "orders": [
+      {
+        "id": "e02e1faf-e9ba-41cf-a4b5-2e9dfa37791a",
+        "product": "spring",
+        "at": "2026-10-22T19:04:08.024Z"
+      }
+    ],
+    "privateDatabase": {
+      "id": "6ada5d18fc09ae5c3cb330ae",
+      "type": "postgres",
+      "publicNetwork": false,
+      "version": "16.14"
+    },
+    "tokenGeneratedInWorkflow": true
+  },
+  "releases": {
+    "current": "6ada64c07b39ae02649ceaf2",
+    "items": [
+      {
+        "id": "6ada64c07b39ae02649ceaf2",
+        "tag": "v2",
+        "state": "READY",
+        "createdAt": "2026-10-22T19:32:16.713Z",
+        "finishedAt": "2026-10-22T19:32:42.025Z"
+      },
+      {
+        "id": "6ada5d44ce14a814502a69f0",
+        "tag": "v1",
+        "state": "READY",
+        "createdAt": "2026-10-22T19:00:20.056Z",
+        "finishedAt": "2026-10-22T19:00:43.098Z"
+      }
+    ]
+  },
+  "v2MarkerPresent": true,
+  "orders": {
+    "afterFirstRestore": [
+      "e02e1faf-e9ba-41cf-a4b5-2e9dfa37791a"
+    ],
+    "afterUndo": [
+      "96532e1c-aa26-4bfe-8feb-ec0bf1e0a0b4",
+      "e02e1faf-e9ba-41cf-a4b5-2e9dfa37791a"
+    ]
+  },
+  "incident": {
+    "id": "e50c67d8-8855-4670-82f6-c6e30388680f",
+    "appId": "gb-care-mvjwlsgo",
+    "title": "ثبت سفارش فروشگاه با اختلال روبه‌رو شده",
+    "summary": "3 بررسی پیاپی ناموفق بود. همراه در حال بررسی علت است.",
+    "status": "RESOLVED",
+    "createdAt": "2026-10-22T19:07:09.585Z",
+    "updatedAt": "2026-10-22T19:19:14.821Z",
+    "evidence": [
+      {
+        "label": "بررسی سلامت",
+        "value": "HTTP 503",
+        "source": "APP_HEALTH_URL",
+        "at": "2026-10-22T19:07:09.585Z"
+      },
+      {
+        "label": "ثبت سفارش آزمایشی",
+        "value": "ناموفق",
+        "source": "business-check",
+        "at": "2026-10-22T19:07:09.585Z"
+      },
+      {
+        "label": "لاگ برنامه",
+        "value": "234096\\\",\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"stdout\\\\\\\",\\\\\\\"_entry\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"at\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"2026-10-22T19:04:57.530Z\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"level\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"error\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"event\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"controlled_test_fault\\\\\\\\\\\\\\\"}\\\\\\\"}\\\"],[\\\"1792695896731833674\\\",\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"stdout\\\\\\\",\\\\\\\"_entry\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"at\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"2026-10-22T19:04:56.731Z\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"level\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"warn\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"event\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"controlled_test_fault_enabled\\\\\\\\\\\\\\\"}\\\\\\\"}\\\"]]},{\\\"metaData\\\":{\\\"releaseId\\\":\\\"6ada5d44ce14a814502a69f0\\\"},\\\"values\\\":[[\\\"1792695970584455317\\\",\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"stdout\\\\\\\",\\\\\\\"_entry\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"at\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"2026-10-22T19:06:10.584Z\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"level\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"error\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"event\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"controlled_test_fault\\\\\\\\\\\\\\\"}\\\\\\\"}\\\"],[\\\"1792695910820815828\\\",\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"stdout\\\\\\\",\\\\\\\"_entry\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"at\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"2026-10-22T19:05:10.820Z\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"level\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"error\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"event\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"controlled_test_fault\\\\\\\\\\\\\\\"}\\\\\\\"}\\\"],[\\\"1792695910076755938\\\",\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"stdout\\\\\\\",\\\\\\\"_entry\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"at\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"2026-10-22T19:05:10.076Z\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"level\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"error\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"event\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"controlled_test_fault\\\\\\\\\\\\\\\"}\\\\\\\"}\\\"],[\\\"1792695848039891640\\\",\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"stdout\\\\\\\",\\\\\\\"_entry\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"at\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"2026-10-22T19:04:08.038Z\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"level\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"info\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"event\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"demo_order_created\\\\\\\\\\\\\\\"}\\\\\\\"}\\\"],[\\\"1792695675437681909\\\",\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"stdout\\\\\\\",\\\\\\\"_entry\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"at\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"2026-10-22T19:01:15.435Z\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"level\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"info\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"event\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"golbazar_ready\\\\\\\\\\\\\\\"}\\\\\\\"}\\\"]]}]}\"}",
+        "source": "Liara logs API",
+        "at": "2026-10-22T19:07:13.465Z"
+      },
+      {
+        "label": "لاگ برنامه",
+        "value": "\\\\\"event\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"controlled_test_fault\\\\\\\\\\\\\\\"}\\\\\\\"}\\\"],[\\\"1792696091710449420\\\",\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"stdout\\\\\\\",\\\\\\\"_entry\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"at\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"2026-10-22T19:08:11.710Z\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"level\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"error\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"event\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"controlled_test_fault\\\\\\\\\\\\\\\"}\\\\\\\"}\\\"],[\\\"1792696091061335849\\\",\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"stdout\\\\\\\",\\\\\\\"_entry\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"at\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"2026-10-22T19:08:11.061Z\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"level\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"error\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"event\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"controlled_test_fault\\\\\\\\\\\\\\\"}\\\\\\\"}\\\"],[\\\"1792695970584455317\\\",\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"stdout\\\\\\\",\\\\\\\"_entry\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"at\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"2026-10-22T19:06:10.584Z\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"level\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"error\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"event\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"controlled_test_fault\\\\\\\\\\\\\\\"}\\\\\\\"}\\\"],[\\\"1792695910820815828\\\",\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"stdout\\\\\\\",\\\\\\\"_entry\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"at\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"2026-10-22T19:05:10.820Z\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"level\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"error\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"event\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"controlled_test_fault\\\\\\\\\\\\\\\"}\\\\\\\"}\\\"],[\\\"1792695910076755938\\\",\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"stdout\\\\\\\",\\\\\\\"_entry\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"at\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"2026-10-22T19:05:10.076Z\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"level\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"error\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"event\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"controlled_test_fault\\\\\\\\\\\\\\\"}\\\\\\\"}\\\"],[\\\"1792695848039891640\\\",\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"stdout\\\\\\\",\\\\\\\"_entry\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"at\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"2026-10-22T19:04:08.038Z\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"level\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"info\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"event\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"demo_order_created\\\\\\\\\\\\\\\"}\\\\\\\"}\\\"],[\\\"1792695675437681909\\\",\\\"{\\\\\\\"type\\\\\\\":\\\\\\\"stdout\\\\\\\",\\\\\\\"_entry\\\\\\\":\\\\\\\"{\\\\\\\\\\\\\\\"at\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"2026-10-22T19:01:15.435Z\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"level\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"info\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"event\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"golbazar_ready\\\\\\\\\\\\\\\"}\\\\\\\"}\\\"]]}]}\"}",
+        "source": "Liara logs API",
+        "at": "2026-10-22T19:16:47.582Z"
+      }
+    ],
+    "timeline": [
+      {
+        "status": "DETECTED",
+        "at": "2026-10-22T19:07:09.585Z",
+        "note": "اختلال توسط پایش مستقل شناسایی شد."
+      },
+      {
+        "status": "INVESTIGATING",
+        "at": "2026-10-22T19:07:09.595Z",
+        "note": "در حال جمع‌آوری لاگ و بررسی مسیر سفارش"
+      },
+      {
+        "status": "ESCALATED",
+        "at": "2026-10-22T19:08:48.802Z",
+        "note": "تحلیل آماده است؛ اصلاح امنِ قابل‌اجرایی پیشنهاد نشده است."
+      },
+      {
+        "status": "INVESTIGATING",
+        "at": "2026-10-22T19:16:45.179Z",
+        "note": "در حال جمع‌آوری لاگ و بررسی مسیر سفارش"
+      },
+      {
+        "status": "PLAN_READY",
+        "at": "2026-10-22T19:17:41.598Z",
+        "note": "راهکار با توجه به شواهد آماده شد."
+      },
+      {
+        "status": "AWAITING_APPROVAL",
+        "at": "2026-10-22T19:17:41.611Z",
+        "note": "برای «راه‌اندازی مجدد فروشگاه» منتظر تأیید شما هستم."
+      },
+      {
+        "status": "EXECUTING",
+        "at": "2026-10-22T19:18:55.461Z",
+        "note": "تأیید شما دریافت شد؛ در حال اجرا."
+      },
+      {
+        "status": "VERIFYING",
+        "at": "2026-10-22T19:18:56.220Z",
+        "note": "عملیات ارسال شد؛ اکنون نتیجهٔ واقعی را بررسی می‌کنم."
+      },
+      {
+        "status": "RESOLVED",
+        "at": "2026-10-22T19:19:14.821Z",
+        "note": "فروشگاه دوباره سالم است؛ مسیر ثبت سفارش هم تأیید شد."
+      }
+    ],
+    "source": "live",
+    "diagnosis": "حادثه e50c67d8 برای gb-care-mvjwlsgo هنوز باز است. پایش اول 503 و ثبت سفارش ناموفق دید؛ بعد حدود ۱۹:۱۰ تا ۱۹:۱۶ چند بار سالم (۲۰۰) بود و نوب ۱۹:۱۷ دوباره 503. یعنی وضعیت نوسان دارد و هنوز «حل شد» نمی‌گویم.\n\nلاگ‌ها: golbazar_ready، بعد demo_order_created، بعد controlled_test_fault_enabled و خطاهای controlled_test_fault؛ دوباره حدود ۱۹:۱۶ controlled_test_fault_enabled. متریک CPU و RAM پایین است؛ شبیه کرش یا کمبود منابع نیست.\n\nمنبع منتشرشده (index.mjs) نشان می‌دهد خطا از متغیر حافظه‌ای faultUntil است: تا زمان مشخصی health و سفارش را عمداً 503 می‌کند؛ با POST به مسیر کنترل fault روشن/خاموش می‌شود. ری‌استart در کد faultUntil را از صفر شروع می‌کند؛ پس از نظر کد می‌تواند این حالت را پاک کند. نامشخص است چه چیزی دوباره fault را روشن می‌کند (مثلاً پایش یا درخواست کنترلی)؛ ری‌استart ممکن است موقت باشد.\n\nبا این شواهد، درخواست «راه‌اندازی مجدد فروشگاه» ثبت شد (شناسه c0db59ad) و تا تأیید شما اجرا نمی‌شود. بعد از اجرا باید سلامت و ثبت سفارش دوباره بررسی شود تا موفقیت تأیید شود.",
+    "actionId": "c0db59ad-90a3-45df-9386-a55d80955dfc",
+    "verification": "بررسی سلامت و آزمایش ثبت سفارش هر دو موفق بودند. زمان پاسخ 1087ms."
+  },
+  "approvalInterlock": {
+    "at": "2026-10-22T19:18:35.310Z",
+    "http": 409,
+    "actionId": "c0db59ad-90a3-45df-9386-a55d80955dfc",
+    "status": "pending",
+    "healthStatus": 503,
+    "diagnosis": "حادثه e50c67d8 برای gb-care-mvjwlsgo هنوز باز است. پایش اول 503 و ثبت سفارش ناموفق دید؛ بعد حدود ۱۹:۱۰ تا ۱۹:۱۶ چند بار سالم (۲۰۰) بود و نوب ۱۹:۱۷ دوباره 503. یعنی وضعیت نوسان دارد و هنوز «حل شد» نمی‌گویم.\n\nلاگ‌ها: golbazar_ready، بعد demo_order_created، بعد controlled_test_fault_enabled و خطاهای controlled_test_fault؛ دوباره حدود ۱۹:۱۶ controlled_test_fault_enabled. متریک CPU و RAM پایین است؛ شبیه کرش یا کمبود منابع نیست.\n\nمنبع منتشرشده (index.mjs) نشان می‌دهد خطا از متغیر حافظه‌ای faultUntil است: تا زمان مشخصی health و سفارش را عمداً 503 می‌کند؛ با POST به مسیر کنترل fault روشن/خاموش می‌شود. ری‌استart در کد faultUntil را از صفر شروع می‌کند؛ پس از نظر کد می‌تواند این حالت را پاک کند. نامشخص است چه چیزی دوباره fault را روشن می‌کند (مثلاً پایش یا درخواست کنترلی)؛ ری‌استart ممکن است موقت باشد.\n\nبا این شواهد، درخواست «راه‌اندازی مجدد فروشگاه» ثبت شد (شناسه c0db59ad) و تا تأیید شما اجرا نمی‌شود. بعد از اجرا باید سلامت و ثبت سفارش دوباره بررسی شود تا موفقیت تأیید شود.",
+    "incidentId": "e50c67d8-8855-4670-82f6-c6e30388680f"
+  },
+  "actions": [
+    {
+      "id": "a7171f61-35e7-41be-88bd-e34c6287a84f",
+      "kind": "restore_backup",
+      "title": "بازگردانی نسخهٔ پشتیبان",
+      "target": "gb-care-mvjwlsgo",
+      "status": "completed",
+      "createdAt": "2026-10-22T19:35:42.897Z",
+      "steps": [
+        {
+          "label": "تأیید شما و فروشگاه مقصد بررسی شد",
+          "status": "done",
+          "at": "2026-10-22T19:36:17.127Z"
+        },
+        {
+          "label": "در حال تهیهٔ نسخهٔ ایمنی از سفارش‌های فعلی",
+          "status": "running",
+          "at": "2026-10-22T19:36:17.139Z"
+        },
+        {
+          "label": "نسخهٔ ایمنی ذخیره و آزمایش شد",
+          "status": "done",
+          "at": "2026-10-22T19:36:18.343Z"
+        },
+        {
+          "label": "سفارش‌های بازیابی‌شده با نسخهٔ انتخابی تطبیق داده شد",
+          "status": "done",
+          "at": "2026-10-22T19:36:19.267Z"
+        },
+        {
+          "label": "در حال بررسی سایت و ثبت سفارش در دو نوبت",
+          "status": "running",
+          "at": "2026-10-22T19:36:19.279Z"
+        },
+        {
+          "label": "دو بررسی پیاپی ثبت سفارش و سلامت سایت موفق بود",
+          "status": "done",
+          "at": "2026-10-22T19:36:31.754Z"
+        }
+      ],
+      "params": {
+        "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+        "backupId": "383516a6-04cb-458a-b30e-dcf4f187645e",
+        "currentHash": "743645a5b3003874974e7645d6f2ab65e22cef358473ba17c6d1045535b4d158",
+        "backupChecksum": "ea1732a78f9a75a3d6ff44e4aa225fd7d87de92a0417e0170b202f2828d9d3fa",
+        "previewExpiresAt": "2026-10-22T19:40:42.851Z",
+        "backupCount": "2",
+        "currentCount": "1",
+        "removedCount": "0",
+        "changedCount": "0"
+      }
+    },
+    {
+      "id": "98a5940a-7f9f-42e1-a3af-72d91e75655d",
+      "kind": "restore_backup",
+      "title": "بازگردانی نسخهٔ پشتیبان",
+      "target": "gb-care-mvjwlsgo",
+      "status": "completed",
+      "createdAt": "2026-10-22T19:34:08.925Z",
+      "steps": [
+        {
+          "label": "تأیید شما و فروشگاه مقصد بررسی شد",
+          "status": "done",
+          "at": "2026-10-22T19:34:36.784Z"
+        },
+        {
+          "label": "در حال تهیهٔ نسخهٔ ایمنی از سفارش‌های فعلی",
+          "status": "running",
+          "at": "2026-10-22T19:34:36.796Z"
+        },
+        {
+          "label": "نسخهٔ ایمنی ذخیره و آزمایش شد",
+          "status": "done",
+          "at": "2026-10-22T19:34:38.899Z"
+        },
+        {
+          "label": "سفارش‌های بازیابی‌شده با نسخهٔ انتخابی تطبیق داده شد",
+          "status": "done",
+          "at": "2026-10-22T19:34:39.447Z"
+        },
+        {
+          "label": "در حال بررسی سایت و ثبت سفارش در دو نوبت",
+          "status": "running",
+          "at": "2026-10-22T19:34:39.458Z"
+        },
+        {
+          "label": "دو بررسی پیاپی ثبت سفارش و سلامت سایت موفق بود",
+          "status": "done",
+          "at": "2026-10-22T19:34:52.082Z"
+        }
+      ],
+      "params": {
+        "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+        "backupId": "047f6158-6850-41f2-ac9c-eb0aeec7bac7",
+        "currentHash": "ea1732a78f9a75a3d6ff44e4aa225fd7d87de92a0417e0170b202f2828d9d3fa",
+        "backupChecksum": "743645a5b3003874974e7645d6f2ab65e22cef358473ba17c6d1045535b4d158",
+        "previewExpiresAt": "2026-10-22T19:39:08.903Z",
+        "backupCount": "1",
+        "currentCount": "2",
+        "removedCount": "1",
+        "changedCount": "0"
+      }
+    },
+    {
+      "id": "b1897bec-56da-47d0-9c2e-8e2dc90bfb95",
+      "kind": "deploy_release",
+      "title": "انتشار golbazar-care-live-v2.zip",
+      "target": "gb-care-mvjwlsgo",
+      "status": "completed",
+      "createdAt": "2026-10-22T19:31:58.719Z",
+      "steps": [
+        {
+          "label": "تأیید شما و فروشگاه مقصد بررسی شد",
+          "status": "done",
+          "at": "2026-10-22T19:32:11.120Z"
+        },
+        {
+          "label": "تنظیمات فروشگاه با پیشنهاد تأییدشده یکسان است",
+          "status": "done",
+          "at": "2026-10-22T19:32:11.662Z"
+        },
+        {
+          "label": "در حال تهیهٔ نسخهٔ ایمنی پیش از انتشار",
+          "status": "running",
+          "at": "2026-10-22T19:32:11.722Z"
+        },
+        {
+          "label": "نسخهٔ ایمنی آماده است؛ انتشار می‌تواند شروع شود",
+          "status": "done",
+          "at": "2026-10-22T19:32:13.073Z"
+        },
+        {
+          "label": "در حال ارسال نسخهٔ تأییدشده",
+          "status": "running",
+          "at": "2026-10-22T19:32:13.083Z"
+        },
+        {
+          "label": "در حال بررسی سایت و ثبت سفارش در دو نوبت",
+          "status": "running",
+          "at": "2026-10-22T19:32:14.834Z"
+        },
+        {
+          "label": "دو بررسی پیاپی ثبت سفارش و سلامت سایت موفق بود",
+          "status": "done",
+          "at": "2026-10-22T19:32:51.385Z"
+        }
+      ],
+      "params": {
+        "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+        "deploymentConfigHash": "f6bd5d5f0b500e7174c04f041084cfd4f5babc615e9143c84ff9c0aec7166dde",
+        "projectId": "9db76e96-2c42-46ae-aae8-fb3a0b8bfc53",
+        "sourceHash": "69d03864ffd166b30f99c909519b98621e70e443e8f56e8ef1e4cf7c68ec1625",
+        "platform": "docker",
+        "port": "3000",
+        "dependenciesReady": "true"
+      }
+    },
+    {
+      "id": "071cd8b8-84c7-4788-8fcb-2e073082eae4",
+      "kind": "create_backup",
+      "title": "تهیهٔ نسخهٔ پشتیبان",
+      "target": "gb-care-mvjwlsgo",
+      "status": "completed",
+      "createdAt": "2026-10-22T19:20:45.696Z",
+      "steps": [
+        {
+          "label": "تأیید شما و فروشگاه مقصد بررسی شد",
+          "status": "done",
+          "at": "2026-10-22T19:21:30.435Z"
+        },
+        {
+          "label": "در حال تهیه و آزمایش نسخهٔ پشتیبان",
+          "status": "running",
+          "at": "2026-10-22T19:21:30.446Z"
+        },
+        {
+          "label": "ذخیره‌شدن نسخهٔ پشتیبان بررسی شد",
+          "status": "done",
+          "at": "2026-10-22T19:21:32.990Z"
+        }
+      ],
+      "params": {
+        "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9"
+      }
+    },
+    {
+      "id": "c0db59ad-90a3-45df-9386-a55d80955dfc",
+      "kind": "restart_app",
+      "title": "راه‌اندازی مجدد فروشگاه",
+      "target": "gb-care-mvjwlsgo",
+      "status": "completed",
+      "createdAt": "2026-10-22T19:17:41.596Z",
+      "steps": [
+        {
+          "label": "تأیید شما و فروشگاه مقصد بررسی شد",
+          "status": "done",
+          "at": "2026-10-22T19:18:55.485Z"
+        },
+        {
+          "label": "در حال بررسی سایت و ثبت سفارش در دو نوبت",
+          "status": "running",
+          "at": "2026-10-22T19:18:56.231Z"
+        },
+        {
+          "label": "دو بررسی پیاپی ثبت سفارش و سلامت سایت موفق بود",
+          "status": "done",
+          "at": "2026-10-22T19:19:14.807Z"
+        }
+      ],
+      "params": {
+        "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9"
+      }
+    }
+  ],
+  "backups": [
+    {
+      "id": "4b8bea41-e0cd-41f3-9e1a-5e2fcb10c951",
+      "name": "نسخهٔ ایمنی پیش از بازیابی",
+      "at": "2026-10-22T19:36:18.330Z",
+      "size": "0.1 KB",
+      "status": "ready",
+      "source": "live",
+      "checksum": "743645a5b3003874974e7645d6f2ab65e22cef358473ba17c6d1045535b4d158",
+      "orderCount": 1,
+      "verifiedAt": "2026-10-22T19:36:18.330Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "purpose": "نسخهٔ ایمنی پیش از بازیابی"
+    },
+    {
+      "id": "383516a6-04cb-458a-b30e-dcf4f187645e",
+      "name": "نسخهٔ ایمنی پیش از بازیابی",
+      "at": "2026-10-22T19:34:38.886Z",
+      "size": "0.2 KB",
+      "status": "ready",
+      "source": "live",
+      "checksum": "ea1732a78f9a75a3d6ff44e4aa225fd7d87de92a0417e0170b202f2828d9d3fa",
+      "orderCount": 2,
+      "verifiedAt": "2026-10-22T19:34:38.886Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "purpose": "نسخهٔ ایمنی پیش از بازیابی"
+    },
+    {
+      "id": "5b8987e6-0775-484f-a4b8-af496a6defd7",
+      "name": "نسخهٔ ایمنی پیش از انتشار",
+      "at": "2026-10-22T19:32:13.057Z",
+      "size": "0.1 KB",
+      "status": "ready",
+      "source": "live",
+      "checksum": "743645a5b3003874974e7645d6f2ab65e22cef358473ba17c6d1045535b4d158",
+      "orderCount": 1,
+      "verifiedAt": "2026-10-22T19:32:13.057Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "purpose": "نسخهٔ ایمنی پیش از انتشار"
+    },
+    {
+      "id": "047f6158-6850-41f2-ac9c-eb0aeec7bac7",
+      "name": "پشتیبان سفارش‌ها",
+      "at": "2026-10-22T19:21:32.975Z",
+      "size": "0.1 KB",
+      "status": "ready",
+      "source": "live",
+      "checksum": "743645a5b3003874974e7645d6f2ab65e22cef358473ba17c6d1045535b4d158",
+      "orderCount": 1,
+      "verifiedAt": "2026-10-22T19:21:32.975Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "purpose": "پشتیبان سفارش‌ها"
+    }
+  ],
+  "probes": [
+    {
+      "id": "4702ce00-f12c-4a08-9429-4d1a7204f5f7",
+      "at": "2026-10-22T19:04:15.263Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1182,
+      "statusCode": 200
+    },
+    {
+      "id": "fdbe73c5-ffb8-4042-8a77-684b44a78d06",
+      "at": "2026-10-22T19:05:08.905Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": false,
+      "healthOk": false,
+      "businessOk": false,
+      "latency": 1318,
+      "statusCode": 503
+    },
+    {
+      "id": "b7acd1e7-e727-4e34-9e46-00ab48b596fa",
+      "at": "2026-10-22T19:06:08.784Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": false,
+      "healthOk": false,
+      "businessOk": false,
+      "latency": 1186,
+      "statusCode": 503
+    },
+    {
+      "id": "8b1fc790-1f8d-46f7-9dcf-9a5e8a6b9f91",
+      "at": "2026-10-22T19:07:08.900Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": false,
+      "healthOk": false,
+      "businessOk": false,
+      "latency": 1300,
+      "statusCode": 503
+    },
+    {
+      "id": "81e6f8e7-626a-42a2-88a4-c9c2c2c313ee",
+      "at": "2026-10-22T19:08:09.823Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": false,
+      "healthOk": false,
+      "businessOk": false,
+      "latency": 2216,
+      "statusCode": 503
+    },
+    {
+      "id": "bdb0c251-ee86-4b67-a601-7f8f464abf3d",
+      "at": "2026-10-22T19:09:08.943Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": false,
+      "healthOk": false,
+      "businessOk": false,
+      "latency": 1264,
+      "statusCode": 503
+    },
+    {
+      "id": "4cd01081-105c-4ee0-ba33-8499cd665ea0",
+      "at": "2026-10-22T19:10:08.832Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1118,
+      "statusCode": 200
+    },
+    {
+      "id": "1e1aa3e0-85be-4448-acb8-5461475f6dc7",
+      "at": "2026-10-22T19:11:08.858Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1134,
+      "statusCode": 200
+    },
+    {
+      "id": "b99b6bd3-8271-47fa-8333-0acb34116ed2",
+      "at": "2026-10-22T19:12:09.003Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1258,
+      "statusCode": 200
+    },
+    {
+      "id": "1379b979-a663-4d51-b6ea-eab7218513b4",
+      "at": "2026-10-22T19:13:09.149Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1377,
+      "statusCode": 200
+    },
+    {
+      "id": "7c7237ae-3ce2-44ba-a3a2-5fd496e7268d",
+      "at": "2026-10-22T19:14:08.971Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1162,
+      "statusCode": 200
+    },
+    {
+      "id": "031e5629-0679-49b5-822b-b003e9e2b034",
+      "at": "2026-10-22T19:15:09.096Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1265,
+      "statusCode": 200
+    },
+    {
+      "id": "62c992df-30b3-48a3-863e-21eb344d23ee",
+      "at": "2026-10-22T19:16:02.165Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1223,
+      "statusCode": 200
+    },
+    {
+      "id": "23a1b328-1445-486d-a9b8-0ef31057bea4",
+      "at": "2026-10-22T19:17:01.906Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": false,
+      "healthOk": false,
+      "businessOk": false,
+      "latency": 2470,
+      "statusCode": 503
+    },
+    {
+      "id": "bf6dff64-4e90-4530-b124-70202d3cda98",
+      "at": "2026-10-22T19:18:00.614Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": false,
+      "healthOk": false,
+      "businessOk": false,
+      "latency": 1162,
+      "statusCode": 503
+    },
+    {
+      "id": "b4ef56ae-77d5-4d75-bfd6-7b9eaef266ca",
+      "at": "2026-10-22T19:19:02.438Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": false,
+      "healthOk": false,
+      "businessOk": false,
+      "latency": 1194,
+      "statusCode": 503
+    },
+    {
+      "id": "e462c050-2a4e-4bfc-8037-8dd2bf5d169d",
+      "at": "2026-10-22T19:19:08.674Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1225,
+      "statusCode": 200
+    },
+    {
+      "id": "566d205c-d5fc-454c-9513-580b472b273a",
+      "at": "2026-10-22T19:19:14.795Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1087,
+      "statusCode": 200
+    },
+    {
+      "id": "0b9f20d2-fdbf-46ee-9af1-cce3f9d78b5f",
+      "at": "2026-10-22T19:20:00.841Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1218,
+      "statusCode": 200
+    },
+    {
+      "id": "f7b4f732-716d-4616-9346-90f2735fbb9a",
+      "at": "2026-10-22T19:21:00.811Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1186,
+      "statusCode": 200
+    },
+    {
+      "id": "12e59347-82b5-4f5e-ab6e-16fa47f17f50",
+      "at": "2026-10-22T19:22:00.905Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1270,
+      "statusCode": 200
+    },
+    {
+      "id": "e2bde5b7-e3b9-4bc0-903e-84cb3ea4106a",
+      "at": "2026-10-22T19:23:01.518Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1857,
+      "statusCode": 200
+    },
+    {
+      "id": "1478697d-e842-42b7-9ab7-4852b5e23960",
+      "at": "2026-10-22T19:24:01.455Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1793,
+      "statusCode": 200
+    },
+    {
+      "id": "9aa523b5-2c8c-4269-9f03-f8a1ae26449f",
+      "at": "2026-10-22T19:25:00.940Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1224,
+      "statusCode": 200
+    },
+    {
+      "id": "51d17097-2ba9-4b62-9bed-e15fda01842b",
+      "at": "2026-10-22T19:26:00.847Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1075,
+      "statusCode": 200
+    },
+    {
+      "id": "469b0322-115f-48b3-9545-60b51e8e0f5e",
+      "at": "2026-10-22T19:27:01.022Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1202,
+      "statusCode": 200
+    },
+    {
+      "id": "8bd326fb-8a47-4a53-af01-321e39446e42",
+      "at": "2026-10-22T19:28:01.179Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1251,
+      "statusCode": 200
+    },
+    {
+      "id": "f2021174-2422-4dca-96c7-eef37c119b9c",
+      "at": "2026-10-22T19:29:01.204Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1264,
+      "statusCode": 200
+    },
+    {
+      "id": "7e5c041d-ba1f-4311-bb3a-7b229c9ad894",
+      "at": "2026-10-22T19:30:01.238Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1285,
+      "statusCode": 200
+    },
+    {
+      "id": "dd24adfa-24a7-49fe-9a37-54b1d366d5de",
+      "at": "2026-10-22T19:31:01.302Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1270,
+      "statusCode": 200
+    },
+    {
+      "id": "ea06a418-29ba-4a2a-9482-f0690dff2f1e",
+      "at": "2026-10-22T19:31:51.352Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1413,
+      "statusCode": 200
+    },
+    {
+      "id": "966e494a-0aac-4952-a020-0a45d106050a",
+      "at": "2026-10-22T19:32:44.257Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1140,
+      "statusCode": 200
+    },
+    {
+      "id": "574d73a2-687d-43d1-b8dc-d01a5d8aaa38",
+      "at": "2026-10-22T19:32:51.366Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1316,
+      "statusCode": 200
+    },
+    {
+      "id": "d59579de-5724-449a-ba67-2ba68c86db43",
+      "at": "2026-10-22T19:33:50.476Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 2032,
+      "statusCode": 200
+    },
+    {
+      "id": "a6774ae1-924b-4c9c-913f-d7030603fc2a",
+      "at": "2026-10-22T19:34:45.683Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1200,
+      "statusCode": 200
+    },
+    {
+      "id": "6629cbbc-bc12-4695-9388-5c66da52f6a5",
+      "at": "2026-10-22T19:34:52.070Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1349,
+      "statusCode": 200
+    },
+    {
+      "id": "f1132f96-55ec-43eb-bcc8-50dbf454940a",
+      "at": "2026-10-22T19:35:49.805Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1236,
+      "statusCode": 200
+    },
+    {
+      "id": "147dbd70-33dd-4dd4-a59d-90bd8f25fa52",
+      "at": "2026-10-22T19:36:25.654Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1311,
+      "statusCode": 200
+    },
+    {
+      "id": "89d766e9-12c7-4db0-80e9-bb7f3c2dc887",
+      "at": "2026-10-22T19:36:31.747Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1071,
+      "statusCode": 200
+    },
+    {
+      "id": "ea983c05-3aa4-49df-b9a5-c21ee1bc48aa",
+      "at": "2026-10-22T19:36:49.781Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1197,
+      "statusCode": 200
+    },
+    {
+      "id": "0e1b574c-fecc-40fe-932b-c7b97d8a87f4",
+      "at": "2026-10-22T19:37:49.983Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 1381,
+      "statusCode": 200
+    },
+    {
+      "id": "b06d2ba0-9ec1-456f-a1af-7c67777518c4",
+      "at": "2026-10-22T19:38:53.571Z",
+      "scope": "62bc0604f2ebdbc4dafa4c550b52ff82475025baf1298c90fe98e6be522192d9",
+      "healthy": true,
+      "healthOk": true,
+      "businessOk": true,
+      "latency": 4965,
+      "statusCode": 200
+    }
+  ],
+  "tools": [
+    {
+      "at": "2026-10-22T19:38:39.438Z",
+      "type": "cursor_run",
+      "title": "بررسی توسط Cursor تکمیل شد"
+    },
+    {
+      "at": "2026-10-22T19:37:39.887Z",
+      "type": "tool_completed",
+      "title": "ابزار get_deployed_source_context پاسخ داد"
+    },
+    {
+      "at": "2026-10-22T19:37:39.877Z",
+      "type": "tool_started",
+      "title": "بررسی ابزار get_deployed_source_context شروع شد"
+    },
+    {
+      "at": "2026-10-22T19:37:39.871Z",
+      "type": "tool_completed",
+      "title": "ابزار get_memory پاسخ داد"
+    },
+    {
+      "at": "2026-10-22T19:37:39.866Z",
+      "type": "tool_started",
+      "title": "بررسی ابزار get_memory شروع شد"
+    },
+    {
+      "at": "2026-10-22T19:23:11.556Z",
+      "type": "cursor_run",
+      "title": "بررسی توسط Cursor تکمیل شد"
+    },
+    {
+      "at": "2026-10-22T19:22:52.757Z",
+      "type": "tool_completed",
+      "title": "ابزار get_project_analysis پاسخ داد"
+    },
+    {
+      "at": "2026-10-22T19:22:52.754Z",
+      "type": "tool_started",
+      "title": "بررسی ابزار get_project_analysis شروع شد"
+    },
+    {
+      "at": "2026-10-22T19:18:08.251Z",
+      "type": "cursor_run",
+      "title": "بررسی توسط Cursor تکمیل شد"
+    },
+    {
+      "at": "2026-10-22T19:17:41.633Z",
+      "type": "tool_completed",
+      "title": "ابزار request_action پاسخ داد"
+    },
+    {
+      "at": "2026-10-22T19:17:41.586Z",
+      "type": "tool_started",
+      "title": "بررسی ابزار request_action شروع شد"
+    },
+    {
+      "at": "2026-10-22T19:17:33.194Z",
+      "type": "tool_completed",
+      "title": "ابزار get_deployed_source_context پاسخ داد"
+    },
+    {
+      "at": "2026-10-22T19:17:32.920Z",
+      "type": "tool_started",
+      "title": "بررسی ابزار get_deployed_source_context شروع شد"
+    },
+    {
+      "at": "2026-10-22T19:17:23.539Z",
+      "type": "tool_completed",
+      "title": "ابزار get_logs پاسخ داد"
+    },
+    {
+      "at": "2026-10-22T19:17:22.029Z",
+      "type": "tool_completed",
+      "title": "ابزار get_metrics پاسخ داد"
+    },
+    {
+      "at": "2026-10-22T19:17:21.294Z",
+      "type": "tool_completed",
+      "title": "ابزار get_memory پاسخ داد"
+    },
+    {
+      "at": "2026-10-22T19:17:21.291Z",
+      "type": "tool_started",
+      "title": "بررسی ابزار get_metrics شروع شد"
+    },
+    {
+      "at": "2026-10-22T19:17:21.287Z",
+      "type": "tool_started",
+      "title": "بررسی ابزار get_logs شروع شد"
+    },
+    {
+      "at": "2026-10-22T19:17:21.281Z",
+      "type": "tool_started",
+      "title": "بررسی ابزار get_memory شروع شد"
+    },
+    {
+      "at": "2026-10-22T19:08:44.570Z",
+      "type": "cursor_run",
+      "title": "بررسی توسط Cursor تکمیل شد"
+    },
+    {
+      "at": "2026-10-22T19:07:44.986Z",
+      "type": "tool_completed",
+      "title": "ابزار get_logs پاسخ داد"
+    },
+    {
+      "at": "2026-10-22T19:07:43.074Z",
+      "type": "tool_completed",
+      "title": "ابزار get_metrics پاسخ داد"
+    },
+    {
+      "at": "2026-10-22T19:07:42.505Z",
+      "type": "tool_completed",
+      "title": "ابزار get_memory پاسخ داد"
+    },
+    {
+      "at": "2026-10-22T19:07:42.502Z",
+      "type": "tool_started",
+      "title": "بررسی ابزار get_metrics شروع شد"
+    },
+    {
+      "at": "2026-10-22T19:07:42.497Z",
+      "type": "tool_started",
+      "title": "بررسی ابزار get_logs شروع شد"
+    },
+    {
+      "at": "2026-10-22T19:07:42.492Z",
+      "type": "tool_started",
+      "title": "بررسی ابزار get_memory شروع شد"
+    }
+  ],
+  "cursorFinalReply": "خلاصهٔ گزارش آزمون gb-care-mvjwlsgo (فقط از حافظه و منبع منتشرشده):\n\nرخداد e50c67d8 (ثبت سفارش با 503) با تأیید شما ری‌استart شد؛ در پرونده نوشته شده بعد از اجرا سلامت و ثبت سفارش آزمایشی هر دو موفق بوده (حدود ۱۹:۱۹، پاسخ حدود ۱۰۸۷ میلی‌ثانیه) و حادثه «برطرف‌شده» ثبت شده. این یعنی در همان لحظهٔ تأیید سیستم، فروشگاه از دید پایش سالم بوده؛ الان دوباره تست نکردم.\n\nانتشار نسخهٔ دوم (golbazar-care-live-v2.zip) حدود ۱۹:۳۲ با تأیید «سلامت + مسیر کسب‌وکار» ثبت شده (شناسهٔ نسخه 6ada64c07b39ae02649ceaf2). دو بار «بازگردانی نسخهٔ پشتیبان» هم با تأیید شما انجام شده: اولی حدود ۱۹:۳۴ (پشتیبان با ۲ ردیف، آزمایش جداگانه ثبت شده)، دومی حدود ۱۹:۳۶ (۱ ردیف)؛ هر دو بار در audit «Health + business check passed» آمده. پایش‌های بعد از آن تا حدود ۱۹:۳۶ هم ۲۰۰ و سالم بودند.\n\nهش سورس فعالِ ثبت‌شده در همراه برای همین برنامه: 69d03864ffd166b30f99c909519b98621e70e443e8f56e8ef1e4cf7c68ec1625 (پروژه v2). نسخهٔ اول با هش دیگر بود؛ منبع فعلی همان zip v2 است.\n\nمحدودیت شواهد: این‌ها سوابق همراه و متن کد منتشرشده‌اند، نه دستور اجرا. انتشار دستی بیرون از همراه دیده نمی‌شود؛ مقادیر محیط اجرا (مثل توکن‌ها) در ابزار نیست. موفقیت بازیابی یعنی چک‌های ثبت‌شدهٔ همراه، نه بررسی دستی شما روی همهٔ سفارش‌های واقعی مشتری. برای وضعیت لحظه‌ای باید پایش تازه باشد که این پاسخ فقط به تاریخچهٔ موجود تکیه دارد.",
+  "tests": {
+    "total": 87,
+    "passed": 87,
+    "failed": 0,
+    "build": "passed"
+  },
+  "limits": [
+    "Application-specific order backup, not full database recovery",
+    "Encrypted backup on local agent device; preserve vault master key",
+    "No real payment or customer PII",
+    "Custom domain DNS/TLS not tested in this run; Liara HTTPS subdomain was used",
+    "Six-hour backup schedule covered locally, not a six-hour live endurance run",
+    "No unconditional guarantee about delayed billing settlement"
+  ]
+}

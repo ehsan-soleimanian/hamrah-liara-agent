@@ -12,12 +12,18 @@ import {
   ShieldCheck,
   UploadCloud,
 } from "lucide-react";
-import type { Snapshot } from "./types";
+import type { Snapshot, Action } from "./types";
 import type { ProjectReport } from "./project-types";
 import { api, cn, fa } from "./lib";
 import ProvisionFlow from "./ProvisionFlow";
 
-export default function SetupPage({ state }: { state: Snapshot }) {
+export default function SetupPage({
+  state,
+  onUpdateReady,
+}: {
+  state: Snapshot;
+  onUpdateReady: (action: Action) => void;
+}) {
   const [step, setStep] = useState(0);
   const [source, setSource] = useState<"github" | "zip">("github");
   const [url, setUrl] = useState("");
@@ -30,6 +36,19 @@ export default function SetupPage({ state }: { state: Snapshot }) {
   const [error, setError] = useState("");
   const [loaded, setLoaded] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
+  const canUpdate = !!state.managedAppId && state.connections.writable;
+  async function updateCurrent() {
+    if (!report) return;
+    setBusy(true);
+    setError("");
+    try {
+      onUpdateReady(await api<Action>(`/projects/${report.id}/update`, {}));
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
   useEffect(() => {
     let alive = true;
     fetch("/api/projects/active")
@@ -404,12 +423,29 @@ export default function SetupPage({ state }: { state: Snapshot }) {
                 </details>
               )}
               <div className="wizard-buttons">
+                {canUpdate && (
+                  <button
+                    className="button primary"
+                    disabled={busy || !!report.blockers.length}
+                    onClick={() => void updateCurrent()}
+                  >
+                    {busy ? (
+                      <LoaderCircle className="spin" size={17} />
+                    ) : (
+                      <Rocket size={17} />
+                    )}{" "}
+                    انتشار روی فروشگاه فعلی
+                  </button>
+                )}
                 <button
-                  className="button primary"
-                  disabled={!!report.blockers.length}
+                  className={cn("button", canUpdate ? "secondary" : "primary")}
+                  disabled={busy || !!report.blockers.length}
                   onClick={() => go(2)}
                 >
-                  ادامه به تنظیمات و انتشار <ArrowLeft size={17} />
+                  {canUpdate
+                    ? "ساخت فروشگاه جداگانه"
+                    : "ادامه به تنظیمات و انتشار"}{" "}
+                  <ArrowLeft size={17} />
                 </button>
                 <button className="text-button" onClick={() => go(0)}>
                   تغییر پروژه

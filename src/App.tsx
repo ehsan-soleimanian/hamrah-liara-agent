@@ -767,7 +767,15 @@ export default function App() {
               run={run}
             />
           )}
-          {page === "setup" && <SetupPage state={state} />}{" "}
+          {page === "setup" && (
+            <SetupPage
+              state={state}
+              onUpdateReady={(a) => {
+                setApproval(a);
+                setRestoreText("");
+              }}
+            />
+          )}{" "}
           {page === "services" && (
             <>
               <div className="info-line">
@@ -1721,6 +1729,8 @@ export default function App() {
                           });
                           setApproval(null);
                           setService(null);
+                          if (currentApproval.kind === "deploy_release")
+                            navigate("deployments");
                         },
                         "نتیجهٔ عملیات در فعالیت‌ها ثبت شد.",
                       )
