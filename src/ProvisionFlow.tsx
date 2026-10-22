@@ -1,3 +1,4 @@
+import DomainFlow from "./DomainFlow";
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -1076,6 +1077,9 @@ export default function ProvisionFlow({
             >
               دیدن سایت <ArrowLeft size={17} />
             </a>
+          )}
+          {job.status === "completed" && !job.retiredAt && (
+            <DomainFlow key={job.id} jobId={job.id} />
           )}
           {!!job.resources.length && (
             <details>

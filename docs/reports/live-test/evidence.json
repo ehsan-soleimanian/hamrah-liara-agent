@@ -100,7 +100,13 @@
       "name": "دامنه، DNS و HTTPS",
       "status": "warn",
       "label": "بخشی بررسی شد",
-      "detail": "در تست، آدرس پیش‌فرض https://golbazar-hamrah-1022.liara.run با اعتبارسنجی معمول TLS استفاده شد. دامنهٔ اختصاصی، رکوردهای DNS، صدور و تمدید SSL اختصاصی و هدایت HTTP به HTTPS آزمایش نشدند. جریان فعلی فقط آدرس پیش‌فرض لیارا را فعال می‌کند و مدیریت دامنهٔ اختصاصی پیاده‌سازی نشده است. تنظیم DNS سیستم و فایل hosts تغییر نکرد."
+      "detail": "در آزمون ابری قبلی، فقط HTTPS پیش‌فرض liara.run استفاده شد؛ دامنهٔ شخصی زنده آزمایش نشد. اکنون جریان DNS لیارا، تغییر NS توسط کاربر، ثبت خودکار رکوردهای اتصال/مالکیت/ACME و درخواست SSL پیاده‌سازی و با پاسخ‌های کنترل‌شده تست شده است. این به‌معنای صدور واقعی گواهی برای دامنهٔ شخصی نیست."
+    },
+    {
+      "name": "جریان جدید DNS لیارا",
+      "status": "pass",
+      "label": "تست کنترل‌شده",
+      "detail": "۱۶ تست دامنه و ۷۲ تست کل پروژه موفق شدند. خواندن API واقعی DNS با HTTP 200 تأیید شد؛ هیچ zone واقعی، دامنه یا منبع هزینه‌دار جدیدی ساخته نشد. کاربر فقط NS را در ثبت‌کننده تغییر می‌دهد و ایجنت پس از بررسی مستقل آن، رکوردها و SSL را پیگیری می‌کند."
     }
   ],
   "timeline": [
@@ -339,7 +345,7 @@
       "cleanupFinishedAt": "2026-10-22T13:55:48.300Z"
     }
   },
-  "limitations": "این یک آزمون یکپارچه‌سازی روی فروشگاه آزمایشی است، نه گواهی آمادگی عمومی برای همهٔ پروژه‌ها. پرداخت بانکی، بازگردانی ابری دیتابیس و مهاجرت دلخواه پروژه‌ها در این آزمون انجام نشد. Vault محلی جایگزین KMS چندکاربره نیست. DNS لیارا در میانهٔ تست از دو resolver مستقل SERVFAIL داشت. اطلاعات شخصی و پرداخت واقعی در فروشگاه دریافت نشد. Docker محلی به‌علت فشار منابع لپ‌تاپ، مبنای ادعای موفقیت نیست. مدیریت دامنهٔ اختصاصی، DNS و صدور/تمدید گواهی اختصاصی در جریان فعلی پیاده‌سازی نشده و در این تست بررسی نشد؛ استفادهٔ موفق از HTTPS پیش‌فرض به‌معنای آزمون کامل SSL نیست.",
+  "limitations": "این یک آزمون یکپارچه‌سازی روی فروشگاه آزمایشی است، نه گواهی آمادگی عمومی برای همهٔ پروژه‌ها. پرداخت بانکی، بازگردانی ابری دیتابیس و مهاجرت دلخواه پروژه‌ها در این آزمون انجام نشد. Vault محلی جایگزین KMS چندکاربره نیست. DNS لیارا در میانهٔ تست از دو resolver مستقل SERVFAIL داشت. اطلاعات شخصی و پرداخت واقعی در فروشگاه دریافت نشد. Docker محلی به‌علت فشار منابع لپ‌تاپ، مبنای ادعای موفقیت نیست. در آزمون ابری قبلی دامنهٔ اختصاصی بررسی نشد. جریان جدید DNS لیارا اکنون پیاده‌سازی شده و تست کنترل‌شده دارد، ولی دامنهٔ شخصی زنده و صدور واقعی گواهی هنوز آزمایش نشده‌اند.",
   "cleanupRecheck": {
     "inventory": {
       "checkedAt": "2026-10-22T14:30:22.690Z",
@@ -400,5 +406,37 @@
     "scope": "Only personal account and Liara team used by this test; unrelated teams untouched.",
     "billingObservation": "Team credit unchanged since 13:55:48 UTC. Snapshot is not a final invoice.",
     "otherResources": "Test created no object storage, email, Redis or virtual machine services."
+  },
+  "domainWorkflow": {
+    "provider": "Liara DNS",
+    "fullSuite": {
+      "tests": 72,
+      "passed": 72,
+      "failed": 0,
+      "execution": "sequential"
+    },
+    "domainTests": 16,
+    "liveDnsApiRead": {
+      "endpoint": "https://dns-service.liara.ir/api/v1/zones",
+      "status": 200,
+      "zoneCount": 0,
+      "writesPerformed": false
+    },
+    "liveCustomDomainE2E": false,
+    "userStep": "Change registrar nameservers to the exact NS values returned for the Liara zone. Confirm migration of existing records if applicable.",
+    "automatedSteps": [
+      "Zone setup after approval",
+      "Exact public NS and provider ACTIVE verification",
+      "ALIAS/CNAME, ownership TXT and ACME CNAME creation after approval and NS validation",
+      "SSL request by domain name",
+      "TLS identity/chain/expiry and HTTPS response checks",
+      "Persistent background follow-up and audit"
+    ],
+    "limitations": [
+      "Existing private DNS records cannot all be discovered publicly; migration must precede NS handoff",
+      "HTTP-to-HTTPS enforcement for arbitrary app code is not automated",
+      "Server must remain running for monitoring"
+    ],
+    "report": "../domains/report.html"
   }
 }

@@ -153,6 +153,7 @@ app.post("/api/connection", async (req, res) => {
   if (
     engine.executing ||
     provisioner.busy ||
+    engine.domains.busy ||
     importing ||
     engine.probing ||
     engine.refreshing ||
@@ -255,6 +256,38 @@ app.post("/api/connection", async (req, res) => {
     switching = false;
   }
 });
+app.get("/api/domains", (req, res) =>
+  res.json(
+    engine.domains.list(
+      typeof req.query.jobId === "string" ? req.query.jobId : undefined,
+    ),
+  ),
+);
+app.post("/api/domains/plan", async (req, res) =>
+  res.json(await engine.domains.plan(req.body)),
+);
+app.post("/api/domains/:id/decision", async (req, res) => {
+  const input = z
+    .object({ fingerprint: z.string().length(64), approve: z.boolean() })
+    .strict()
+    .parse(req.body);
+  res.json(
+    await engine.domains.decide(
+      req.params.id,
+      input.fingerprint,
+      input.approve,
+    ),
+  );
+});
+app.post("/api/domains/:id/nameservers", async (req, res) =>
+  res.json(await engine.domains.confirmNameservers(req.params.id)),
+);
+app.post("/api/domains/:id/check", async (req, res) =>
+  res.json(await engine.domains.check(req.params.id)),
+);
+app.post("/api/domains/:id/cancel", async (req, res) =>
+  res.json(await engine.domains.cancel(req.params.id)),
+);
 app.get("/api/provision/catalog", async (_req, res) =>
   res.json(await provisioner.catalog()),
 );
@@ -426,6 +459,7 @@ app.post("/api/settings/liara", (req, res) => {
   if (
     engine.executing ||
     provisioner.busy ||
+    engine.domains.busy ||
     importing ||
     engine.probing ||
     engine.refreshing ||
@@ -471,6 +505,7 @@ app.post("/api/settings/cursor", (req, res) => {
   if (
     engine.executing ||
     provisioner.busy ||
+    engine.domains.busy ||
     importing ||
     engine.brain.isBusy
   ) {
@@ -622,6 +657,7 @@ app.get("/api/memory/export", (_req, res) => {
       messages: state.messages,
       projects: db.list("projects"),
       provisionJobs: db.list("provisionJobs"),
+      domainJobs: engine.domains.list(),
       incidents: state.incidents,
       actions: state.actions,
       audit: state.audit,

@@ -57,3 +57,12 @@
 - Team balance remains 1,998,854.2 Toman, unchanged since 13:55:48 UTC (about 35 minutes). This is an observation, not a final billing settlement or a guarantee about network pricing.
 - No storage, email, Redis or VM service was created during the test. Unrelated teams were not modified.
 - Sanitized inventory and deletion receipts are included in docs/reports/live-test/evidence.json under cleanupRecheck.
+
+
+### Liara DNS workflow — 2026-10-22
+
+- Full current suite: 72 passed, 0 failed with test-concurrency=1. Includes 16 domain tests (two-stage approval, real NS gating, Liara DNS payloads, apex ALIAS coexistence with NS/SOA/MX/TXT, encrypted optional Cloudflare credentials, drift, crash recovery, uncertain SSL writes, stale TLS checks, expired permissions and demo registrar handoff).
+- Initial parallel suite on the memory-constrained host failed startup hooks (39 pass / 25 fail); the sequential suite passed. This was not suppressed or counted as success.
+- Production build passed. Responsive browser workflow tested on isolated demo data; no custom-domain live mutation or SSL issuance claimed.
+- Real Liara DNS GET /zones returned HTTP 200, zero zones in selected team. No zone or paid resource was created for this implementation.
+- Detailed scope and API provenance: DOMAINS.md. Domain report: reports/domains/report.html.

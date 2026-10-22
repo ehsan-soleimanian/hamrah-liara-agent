@@ -5707,3 +5707,288 @@ td:last-child {
   color: #c6d6c5;
   margin-top: 16px;
 }
+
+/* Custom domain setup follows the existing jade/graphite setup surface. */
+.domain-flow {
+  margin-block: 28px;
+  padding: clamp(18px, 3vw, 30px);
+  border: 1px solid var(--border, #ffffff18);
+  border-radius: 22px;
+  background: #ffffff03;
+  text-align: start;
+}
+.domain-heading {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 24px;
+}
+.domain-heading h3 {
+  margin: 0 0 6px;
+}
+.domain-heading p,
+.domain-note {
+  color: var(--muted, #9bafaa);
+  margin: 0;
+  line-height: 1.9;
+}
+.domain-icon {
+  display: grid;
+  place-items: center;
+  width: 50px;
+  height: 50px;
+  flex-shrink: 0;
+  border-radius: 17px;
+  background: #80d6b512;
+  color: #8edbbd;
+}
+.domain-flow input:not([type="checkbox"]):not([type="radio"]) {
+  width: 100%;
+  min-width: 0;
+  padding: 13px 15px;
+  min-height: 48px;
+  border: 1px solid #ffffff24;
+  border-radius: 12px;
+  background: #0c1518;
+  color: #e2ece8;
+  font: inherit;
+  font-size: 16px;
+}
+.domain-flow input:focus-visible,
+.domain-flow button:focus-visible,
+.domain-flow summary:focus-visible {
+  outline: 2px solid #8edbbd;
+  outline-offset: 4px;
+}
+.domain-input-row {
+  display: flex;
+  gap: 12px;
+  margin: 10px 0;
+}
+.domain-input-row .button {
+  flex-shrink: 0;
+}
+.domain-provider {
+  margin: 22px 0;
+  border: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.domain-provider legend {
+  margin-bottom: 10px;
+}
+.domain-provider label {
+  padding: 14px;
+  background: #ffffff04;
+  border: 1px solid #ffffff14;
+  border-radius: 13px;
+  cursor: pointer;
+  min-height: 48px;
+}
+.domain-provider small {
+  display: block;
+  padding-inline-start: 26px;
+  color: #a5b8b1;
+  line-height: 1.8;
+}
+.domain-credential {
+  display: grid;
+  gap: 10px;
+}
+.domain-credential small,
+.domain-flow small {
+  line-height: 1.9;
+  color: #acbcb8;
+}
+.domain-credential a {
+  color: #8edbbd;
+}
+.domain-state {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  margin: 20px 0;
+}
+.domain-state bdi {
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+.domain-status {
+  padding: 7px 12px;
+  border-radius: 30px;
+  background: #e5bc6314;
+  color: #e3c585;
+  font-size: 13px;
+}
+.domain-status.good {
+  background: #81d5b51a;
+  color: #8edbbd;
+}
+.domain-notice {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 13px;
+  background: #8edbbd08;
+  border: 1px solid #8edbbd22;
+  line-height: 2;
+}
+.domain-notice svg {
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+.domain-notice p {
+  margin: 0;
+}
+.domain-records {
+  margin-block: 24px;
+}
+.domain-record {
+  padding: 18px;
+  margin-bottom: 12px;
+  border-radius: 14px;
+  border: 1px solid #ffffff18;
+  background: #0c1619;
+  display: grid;
+  gap: 12px;
+}
+.domain-record > div:first-child {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: #bdcfc7;
+  font-size: 13px;
+}
+.domain-record-type {
+  color: #8edbbd;
+  border: 1px solid #8edbbd30;
+  padding: 3px 9px;
+  border-radius: 6px;
+}
+.domain-record label {
+  color: #a9bdb4;
+  font-size: 13px;
+}
+.domain-record code {
+  display: block;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #e2ece8;
+  margin-top: 5px;
+  font-size: 14px;
+  user-select: all;
+}
+.domain-consent {
+  display: flex;
+  gap: 12px;
+  align-items: start;
+  line-height: 2;
+  padding-block: 15px;
+  cursor: pointer;
+}
+.domain-consent input {
+  margin-top: 8px;
+  flex-shrink: 0;
+  accent-color: #8edbbd;
+  width: 18px;
+  height: 18px;
+}
+.domain-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-block: 16px;
+}
+.domain-checks {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-block: 22px;
+}
+.domain-checks > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  align-items: center;
+  border: 1px solid #ffffff18;
+  border-radius: 13px;
+  padding: 15px;
+  color: #b5b9ac;
+}
+.domain-checks .done {
+  color: #8edbbd;
+  border-color: #8edbbd35;
+}
+.domain-checks small {
+  width: 100%;
+  padding-inline-start: 26px;
+}
+.domain-history {
+  margin-block: 20px;
+}
+.domain-history summary {
+  cursor: pointer;
+  min-height: 44px;
+}
+.domain-history ol {
+  padding-inline-start: 22px;
+  line-height: 2.2;
+}
+.domain-history time {
+  color: #8edbbd;
+}
+@media (max-width: 600px) {
+  .domain-input-row {
+    flex-direction: column;
+  }
+  .domain-checks {
+    grid-template-columns: 1fr;
+  }
+  .domain-heading {
+    align-items: start;
+  }
+  .domain-flow {
+    padding: 18px;
+  }
+  .domain-state bdi {
+    font-size: 17px;
+  }
+}
+.domain-nameservers {
+  border: 1px solid #8edbbd40;
+  background: #8edbbd08;
+  border-radius: 16px;
+  padding: 20px;
+  margin-block: 20px;
+  line-height: 2;
+}
+.domain-nameservers h4 {
+  margin-top: 0;
+}
+.domain-nameservers a {
+  color: #8edbbd;
+}
+.domain-ns {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 12px 15px;
+  margin-block: 10px;
+  border-radius: 10px;
+  background: #0c1619;
+  border: 1px solid #ffffff18;
+}
+.domain-ns code {
+  overflow-wrap: anywhere;
+  font-size: 16px;
+}
+.domain-records summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding-block: 10px;
+}

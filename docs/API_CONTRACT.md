@@ -80,3 +80,8 @@ Base URL ثابت: `https://api.liara.ir`؛ احراز هویت: `Authorization:
 - پاسخ: گزارش شامل id، hash، stack، platform، port، services، envNames، evidence، blockers و warnings. هیچ کد دریافتی در میزبان اجرا نمی‌شود.
 - `POST /api/actions`: برای انتشار پروژه `kind=deploy_release`, `target`, `projectId`, `dependenciesReady=true`. هش و تنظیمات انتشار سمت سرور از گزارش گرفته می‌شوند؛ کاربر نمی‌تواند مسیر فایل یا هش دلخواه برای انتشار بدهد.
 - تصمیم از همان endpoint قبلی با fingerprint، انقضا و جلوگیری از اجرای دوباره ثبت می‌شود. بستهٔ tar.gz از فایل‌های پاک‌سازی‌شده با نام‌های مشخص ساخته می‌شود؛ هر تغییر محتوای سورس باعث شکست بررسی هش می‌شود. ZIP و گزارش محدودیت‌های روشن دارند؛ ساخت/خرید سرویس جداگانه خودکار نیست.
+
+
+## Domain workflow
+
+See [DOMAINS.md](DOMAINS.md) for the two-stage approval protocol, Cloudflare DNS adapter, pinned-public-IP TLS verification and persistent worker. Uses documented Liara domain create/check/provision-ssl endpoints plus public-console details GET /v1/domains/{name}. CNameRecord is a validation status; target is the DNS destination. Both TXT ownership and ACME CNAME are required. No generic force-HTTPS endpoint is assumed.
