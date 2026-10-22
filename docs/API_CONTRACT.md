@@ -84,4 +84,4 @@ Base URL ثابت: `https://api.liara.ir`؛ احراز هویت: `Authorization:
 
 ## Domain workflow
 
-See [DOMAINS.md](DOMAINS.md) for the two-stage approval protocol, Cloudflare DNS adapter, pinned-public-IP TLS verification and persistent worker. Uses documented Liara domain create/check/provision-ssl endpoints plus public-console details GET /v1/domains/{name}. CNameRecord is a validation status; target is the DNS destination. Both TXT ownership and ACME CNAME are required. No generic force-HTTPS endpoint is assumed.
+See [DOMAINS.md](DOMAINS.md) for the two-stage approval protocol, Liara DNS adapter (primary), optional Cloudflare adapter, pinned-public-IP TLS verification and persistent worker. Uses documented Liara domain create/check/provision-ssl endpoints plus public-console details GET /v1/domains/{name}. CNameRecord is a validation status; target is the DNS destination. Both TXT ownership and ACME CNAME are required. No generic force-HTTPS endpoint is assumed.

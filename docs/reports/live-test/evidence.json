@@ -437,6 +437,14 @@
       "HTTP-to-HTTPS enforcement for arbitrary app code is not automated",
       "Server must remain running for monitoring"
     ],
-    "report": "../domains/report.html"
+    "report": "../domains/report.html",
+    "publicTlsProbe": {
+      "domain": "docs.liara.ir",
+      "tls": true,
+      "https": true,
+      "redirect": true,
+      "certificateExpiresAt": "2026-11-04T23:01:14.000Z",
+      "customDomainIssuance": false
+    }
   }
 }
