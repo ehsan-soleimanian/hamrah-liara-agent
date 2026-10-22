@@ -333,10 +333,17 @@ export default function SetupPage({ state }: { state: Snapshot }) {
                 ))}
               </div>
               {report.agentReview && (
-                <div className="intake-review">
-                  <Flower2 size={20} />
-                  <p>{report.agentReview}</p>
-                </div>
+                <details
+                  className="intake-review"
+                  open={report.agentReview.length < 1000}
+                >
+                  <summary>توضیح همراه دربارهٔ این پروژه</summary>
+                  <p
+                    style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}
+                  >
+                    {report.agentReview.replace(/<[^>]*>/g, "")}
+                  </p>
+                </details>
               )}
               {!!report.blockers.length && (
                 <div className="intake-blockers" role="alert">

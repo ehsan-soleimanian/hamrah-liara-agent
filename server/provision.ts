@@ -64,6 +64,7 @@ export const provisionSchema = z
   })
   .strict();
 type PrivateQuote = {
+  resumeDeployment?: boolean;
   scopeDigest: string;
   input: ProvisionInput;
   account: string;
@@ -84,6 +85,7 @@ const scope = (job: ProvisionJob) =>
     currency: job.currency,
     items: job.items,
     envNames: job.envNames,
+    continuationOf: job.continuationOf,
   });
 const databaseTypes = ["postgres", "mysql", "mongodb", "redis"];
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -287,14 +289,16 @@ export class Provisioner {
     });
   }
   async catalog() {
-    return config.mode === "demo"
-      ? demoCatalog()
-      : parseCatalog(
-          ...((await Promise.all([
-            this.liara.call("/v1/me"),
-            this.liara.call("/v1/networks"),
-          ])) as [any, any]),
-        );
+    if (config.mode === "demo") return demoCatalog();
+    const [me, networks] = await Promise.all([
+      this.liara.call("/v1/me"),
+      this.liara.call("/v1/networks"),
+    ]);
+    if (config.teamId && me.team?._id !== config.teamId)
+      throw new ProvisionError(
+        "حساب تیمی در پاسخ لیارا تأیید نشد؛ پیشنهاد هزینه ساخته نمی‌شود.",
+      );
+    return parseCatalog(me, networks);
   }
   list(projectId: string) {
     return this.db
@@ -305,6 +309,48 @@ export class Provisioner {
     const job = this.db.get<ProvisionJob>("provisionJobs", id);
     if (!job) throw new ProvisionError("درخواست راه‌اندازی پیدا نشد.");
     return job;
+  }
+  async requote(id: string) {
+    const previous = this.get(id);
+    const quote = this.vault.get<PrivateQuote>(`quote:${id}`);
+    if (
+      previous.status !== "failed" ||
+      !quote ||
+      quote.account !== this.account() ||
+      quote.scopeDigest !== scope(previous) ||
+      previous.mode !== config.mode
+    )
+      throw new ProvisionError(
+        "این درخواست برای بررسی مجدد در حساب فعلی معتبر نیست.",
+      );
+    // Only a definitive payment rejection before any paid resource is eligible.
+    if (
+      !(
+        previous.errorCode === "payment_required" ||
+        previous.error?.includes("HTTP 402")
+      ) ||
+      previous.resources.some((r) => r.kind !== "network")
+    )
+      throw new ProvisionError(
+        "منابع ایجادشده یا نتیجهٔ نامشخص نیازمند بررسی‌اند؛ ساخت دوباره مجاز نیست.",
+      );
+    new Projects(this.db).verify(previous.projectId, previous.sourceHash);
+    const input = structuredClone(quote.input);
+    const network = previous.resources.find((r) => r.kind === "network");
+    if (network) {
+      const catalog = await this.catalog();
+      if (
+        !catalog.networks.some(
+          (n) => n.id === network.id && n.name === network.name,
+        )
+      )
+        throw new ProvisionError(
+          "شبکهٔ قبلی در حساب فعلی تأیید نشد؛ تنظیمات را دوباره بررسی کنید.",
+        );
+      input.networkId = network.id;
+    }
+    // Fresh quote, prices and approval. Secret inputs stay encrypted on the server.
+    return this.quote(input);
   }
   async logs(id: string) {
     const job = this.get(id),
@@ -582,6 +628,205 @@ export class Provisioner {
       );
     return current;
   }
+  private async validateContinuation(job: ProvisionJob, quote: PrivateQuote) {
+    if (
+      quote.account !== this.account() ||
+      job.mode !== "live" ||
+      !job.continuationOf
+    )
+      throw new ProvisionError("حساب ادامهٔ انتشار معتبر نیست.");
+    const original = this.get(job.continuationOf);
+    if (
+      original.status !== "failed" ||
+      original.errorCode !== "source_rejected" ||
+      original.releaseId ||
+      original.steps.find((s) => s.status === "failed")?.key !== "deploy" ||
+      original.steps.find((s) => s.key === "env")?.status !== "done" ||
+      !original.resources.some(
+        (r) => r.kind === "app" && r.id === quote.input.appName,
+      )
+    )
+      throw new ProvisionError(
+        "ادامهٔ امن انتشار برای این درخواست قابل تأیید نیست.",
+      );
+    new Projects(this.db).verify(job.projectId, job.sourceHash);
+    const details = await this.liara.call(
+      `/v1/projects/${encodeURIComponent(job.appName)}`,
+    );
+    const expected = this.vault.get<Record<string, string>>(
+      `app-env:${original.id}`,
+    );
+    const actual = details.project?.envs;
+    if (
+      !expected ||
+      !Array.isArray(actual) ||
+      Object.entries(expected).some(
+        ([k, v]) => !actual.some((e: any) => e.key === k && e.value === v),
+      )
+    )
+      throw new ProvisionError(
+        "تنظیمات برنامه با نسخهٔ ثبت‌شده یکسان نیست؛ ادامه متوقف شد.",
+      );
+    const releases = await this.liara.call(
+      `/v1/projects/${encodeURIComponent(job.appName)}/releases?page=1&count=20`,
+    );
+    if (
+      !Array.isArray(releases.releases) ||
+      releases.releases.length ||
+      releases.currentRelease
+    )
+      throw new ProvisionError(
+        "نسخه‌ای برای برنامه وجود دارد؛ برای جلوگیری از انتشار تکراری، ادامهٔ خودکار متوقف شد.",
+      );
+    return expected;
+  }
+  async continueDeployment(id: string) {
+    if (this.busy || this.engine.executing)
+      throw new ProvisionError("منتظر پایان عملیات جاری بمانید.");
+    const original = this.get(id),
+      old = this.vault.get<PrivateQuote>(`quote:${id}`);
+    if (!old || old.scopeDigest !== scope(original))
+      throw new ProvisionError("پیشنهاد اصلی معتبر نیست.");
+    const now = new Date().toISOString();
+    const job: ProvisionJob = {
+      ...structuredClone(original),
+      id: randomUUID(),
+      continuationOf: id,
+      status: "pending",
+      createdAt: now,
+      expiresAt: new Date(Date.now() + 600000).toISOString(),
+      fingerprint: digest(randomUUID()),
+      error: undefined,
+      errorCode: undefined,
+      nextStep: undefined,
+    };
+    job.steps = job.steps.map((s) =>
+      ["deploy", "verify"].includes(s.key)
+        ? { ...s, status: "waiting", detail: undefined }
+        : s,
+    );
+    const env = await this.validateContinuation(job, old);
+    const catalog = await this.catalog();
+    this.select(catalog, old.input);
+    const pending = this.list(job.projectId).find(
+      (j) =>
+        j.continuationOf === id &&
+        j.status === "pending" &&
+        Date.parse(j.expiresAt) > Date.now(),
+    );
+    if (pending) return pending;
+    const fresh = {
+      ...old,
+      catalog,
+      resumeDeployment: true,
+      fingerprint: job.fingerprint,
+      scopeDigest: scope(job),
+    };
+    this.vault.put(`quote:${job.id}`, fresh);
+    this.vault.put(`app-env:${job.id}`, env);
+    this.db.put("provisionJobs", job);
+    this.db.audit(
+      "deployment_continuation",
+      "ادامهٔ انتشار بدون ساخت مجدد آماده شد",
+      `${id}; ${job.id}`,
+    );
+    this.engine.emit();
+    return job;
+  }
+  async recheckDeployment(id: string) {
+    const job = this.get(id),
+      quote = this.vault.get<PrivateQuote>(`quote:${id}`);
+    if (
+      !quote ||
+      quote.account !== this.account() ||
+      quote.scopeDigest !== scope(job) ||
+      job.mode !== "live" ||
+      !job.releaseId ||
+      !["failed", "needs_verification"].includes(job.status)
+    )
+      throw new ProvisionError("بررسی این انتشار در حساب فعلی مجاز نیست.");
+    const r = await this.liara.call(
+      `/v1/projects/${encodeURIComponent(job.appName)}/releases?page=1&count=20`,
+    );
+    if (r.currentRelease !== job.releaseId)
+      throw new ProvisionError(
+        "نسخهٔ موردنظر هنوز فعال نشده است؛ لاگ ساخت را بررسی و کمی بعد دوباره امتحان کنید.",
+      );
+    const url = `https://${job.appName}.liara.run`,
+      input = quote.input;
+    for (let n = 0; n < 2; n++) {
+      if (n) await this.sleep(5000);
+      if (
+        !(await this.probe(url + input.healthPath, false)) ||
+        (input.businessPath &&
+          !(await this.probe(url + input.businessPath, true)))
+      )
+        throw new ProvisionError(
+          "نسخه فعال است اما سلامت و مسیر کسب‌وکار هنوز تأیید نشده‌اند.",
+        );
+    }
+    job.status = input.businessPath ? "completed" : "needs_verification";
+    job.error = undefined;
+    job.errorCode = undefined;
+    job.nextStep = undefined;
+    job.verification = input.businessPath
+      ? "نسخهٔ درست فعال است؛ سلامت و نوشتن/خواندن آزمایشی دو بار تأیید شد."
+      : "پاسخ سایت تأیید شد؛ عملیات اصلی تنظیم نشده است.";
+    this.step(job, "verify", "done", job.verification);
+    Object.assign(config, {
+      appId: job.appName,
+      healthUrl: url + input.healthPath,
+      businessUrl: input.businessPath ? url + input.businessPath : "",
+      databaseId: job.resources.find((r) => r.kind === "database")?.id || "",
+    });
+    this.persistManaged({
+      appId: config.appId,
+      healthUrl: config.healthUrl,
+      businessUrl: config.businessUrl,
+      databaseId: config.databaseId,
+      secretJobId: job.id,
+    });
+    this.db.audit(
+      "deployment_verified",
+      "نتیجهٔ انتشار پس از آماده‌شدن ابر تأیید شد",
+      job.id,
+    );
+    this.engine.emit();
+    return job;
+  }
+  async buildLogs(id: string) {
+    const job = this.get(id),
+      quote = this.vault.get<PrivateQuote>(`quote:${id}`);
+    if (
+      !quote ||
+      quote.account !== this.account() ||
+      quote.scopeDigest !== scope(job) ||
+      !job.releaseId ||
+      job.mode !== "live"
+    )
+      throw new ProvisionError("لاگ این انتشار در حساب فعلی در دسترس نیست.");
+    registerSecrets(
+      Object.values(
+        this.vault.get<Record<string, string>>(`app-env:${id}`) || {},
+      ),
+    );
+    let since = "",
+      lines: string[] = [];
+    for (let n = 0; n < 5; n++) {
+      const data = await this.liara.call(
+        `/v2/releases/${encodeURIComponent(job.releaseId)}/build-logs${since ? `?since=${encodeURIComponent(since)}` : ""}`,
+      );
+      const output = Array.isArray(data.buildOutput) ? data.buildOutput : [];
+      lines.push(
+        ...output.map((o: any) => `${o.createdAt || ""} ${o.line || ""}`),
+      );
+      if (!output.length) break;
+      const next = output[output.length - 1]?.createdAt;
+      if (!next || next === since) break;
+      since = next;
+    }
+    return { text: (await import("./security.ts")).redact(lines.join("\n")) };
+  }
   private resource(job: ProvisionJob, kind: string, id: string, name: string) {
     job.resources.push({ kind, id, name });
     this.db.audit(
@@ -604,209 +849,213 @@ export class Provisioner {
         );
       }
       await this.assertPrices(quote);
-      let networkId = input.networkId;
-      this.step(job, "network", "running");
-      if (!networkId) {
-        if (demo) networkId = `demo-network-${job.id}`;
-        else {
-          await this.liara.call("/v1/networks", "POST", {
-            networkName: `${input.appName}-net`,
-          });
-          const networks = await this.liara.call("/v1/networks");
-          networkId = networks.networks?.find(
-            (n: any) => n.name === `${input.appName}-net`,
-          )?._id;
-          if (!networkId)
-            throw new ProvisionError(
-              "شبکه ایجاد شد اما شناسهٔ آن قابل تأیید نیست.",
-            );
-        }
-        this.resource(job, "network", networkId, `${input.appName}-net`);
-      }
-      this.step(
-        job,
-        "network",
-        "done",
-        demo
-          ? "شبیه‌سازی؛ شبکهٔ واقعی ساخته نشد"
-          : "شبکهٔ مشترک خصوصی تأیید شد",
-      );
-      this.step(job, "app", "running");
-      const { app: appPlan } = await this.assertPrices(quote);
-      if (!demo) {
-        // Recheck immediately before create. Never mutate a pre-existing app with the same name.
-        if ((await this.liara.apps()).some((a) => a.id === input.appName))
-          throw new ProvisionError(
-            "نام برنامه در این فاصله استفاده شده؛ برنامهٔ موجود تغییر نکرد.",
-          );
-        await this.liara.call("/v1/projects", "POST", {
-          name: input.appName,
-          planID: appPlan.planId,
-          bundlePlanID: appPlan.bundleId,
-          platform: project.platform,
-          network: networkId,
-          readOnlyRootFilesystem: false,
-        });
-        this.resource(job, "app", input.appName, input.appName);
-        const details = await this.liara.call(
-          `/v1/projects/${encodeURIComponent(input.appName)}`,
-        );
-        if (
-          details.project?.project_id !== input.appName ||
-          details.project?.type !== project.platform
-        )
-          throw new ProvisionError(
-            "ساخت برنامه ارسال شد اما مشخصات آن قابل تأیید نیست.",
-          );
-        if (details.project.defaultSubdomain === false) {
-          if (!details.project._id)
-            throw new ProvisionError(
-              "شناسهٔ لازم برای فعال‌سازی آدرس سایت دریافت نشد.",
-            );
-          await this.liara.call(
-            `/v1/projects/${encodeURIComponent(details.project._id)}/default-subdomain/enable`,
-            "POST",
-          );
-        }
-      }
-      if (demo) this.resource(job, "app", input.appName, input.appName);
-      // This permission only covers the exact app the user approved and we just created.
-      if (!demo) {
-        config.allowedApps = [
-          ...new Set([...config.allowedApps, input.appName]),
-        ];
-        this.persistManaged({ appId: input.appName });
-      }
-      this.step(
-        job,
-        "app",
-        "done",
-        demo
-          ? "شبیه‌سازی؛ برنامهٔ واقعی ساخته نشد"
-          : "برنامه با پلتفرم و پلن تأییدشده ایجاد شد",
-      );
-      const variables: Record<string, string> = { ...input.env };
-      for (const [i, database] of input.databases.entries()) {
-        this.step(job, `db-${i}`, "running");
-        const { databases: plans } = await this.assertPrices(quote);
-        let databaseId = `demo-db-${job.id}-${i}`;
-        let details: any;
-        if (demo)
-          details = {
-            hostname: database.name,
-            root_password: `demo-only-${randomUUID()}`,
-            username: "root",
-            dbName: database.type === "postgres" ? "postgres" : "app",
-          };
-        else {
-          const result = await this.liara.call("/v1/databases", "POST", {
-            hostname: database.name,
-            type: database.type,
-            version: database.version,
-            planID: plans[i].planId,
-            bundlePlanID: plans[i].bundleId,
-            publicNetwork: false,
-            network: networkId,
-          });
-          if (typeof result.databaseID !== "string" || !result.databaseID)
-            throw new ProvisionError(
-              "ساخت دیتابیس ارسال شد ولی شناسه دریافت نشد؛ برای جلوگیری از ساخت تکراری متوقف شد.",
-            );
-          databaseId = result.databaseID;
-        }
-        this.resource(job, "database", databaseId, database.name);
-        if (!demo)
-          for (let attempt = 0; attempt < 60; attempt++) {
-            details = (
-              await this.liara.call(
-                `/v1/databases/${encodeURIComponent(databaseId)}`,
-              )
-            ).database;
-            if (
-              details?.hostname !== database.name ||
-              details?.type !== database.type
-            )
+      if (quote.resumeDeployment) {
+        await this.validateContinuation(job, quote);
+      } else {
+        let networkId = input.networkId;
+        this.step(job, "network", "running");
+        if (!networkId) {
+          if (demo) networkId = `demo-network-${job.id}`;
+          else {
+            await this.liara.call("/v1/networks", "POST", {
+              networkName: `${input.appName}-net`,
+            });
+            const networks = await this.liara.call("/v1/networks");
+            networkId = networks.networks?.find(
+              (n: any) => n.name === `${input.appName}-net`,
+            )?._id;
+            if (!networkId)
               throw new ProvisionError(
-                "مشخصات دیتابیس ایجادشده با پیشنهاد تأییدشده یکسان نیست.",
+                "شبکه ایجاد شد اما شناسهٔ آن قابل تأیید نیست.",
               );
-            if (["failed", "error"].includes(details.status))
-              throw new ProvisionError("آماده‌سازی دیتابیس ناموفق بود.");
-            if (
-              details.root_password &&
-              ["ready", "running", "active", "started"].includes(
-                String(details.status).toLowerCase(),
-              )
-            )
-              break;
-            details = undefined;
-            await this.sleep(5000);
           }
-        if (!details)
-          throw new ProvisionError(
-            "آماده‌شدن دیتابیس در زمان مجاز تأیید نشد؛ ساخت دوباره انجام نمی‌شود.",
-          );
-        const values = connectionValues(details, database);
-        for (const [env, part] of Object.entries(database.bindings))
-          variables[env] = values[part];
+          this.resource(job, "network", networkId, `${input.appName}-net`);
+        }
         this.step(
           job,
-          `db-${i}`,
+          "network",
           "done",
           demo
-            ? "اتصال نمایشی آماده شد"
-            : "دیتابیس خصوصی آماده و اطلاعات اتصال دریافت شد",
+            ? "شبیه‌سازی؛ شبکهٔ واقعی ساخته نشد"
+            : "شبکهٔ مشترک خصوصی تأیید شد",
         );
-      }
-      registerSecrets(Object.values(variables));
-      this.step(job, "env", "running");
-      if (!demo) {
-        const details = await this.liara.call(
-          `/v1/projects/${encodeURIComponent(input.appName)}`,
-        );
-        if (!Array.isArray(details.project?.envs))
-          throw new ProvisionError(
-            "تنظیمات فعلی برنامه قابل خواندن نیست؛ برای جلوگیری از حذف تنظیمات، تغییری ارسال نشد.",
+        this.step(job, "app", "running");
+        const { app: appPlan } = await this.assertPrices(quote);
+        if (!demo) {
+          // Recheck immediately before create. Never mutate a pre-existing app with the same name.
+          if ((await this.liara.apps()).some((a) => a.id === input.appName))
+            throw new ProvisionError(
+              "نام برنامه در این فاصله استفاده شده؛ برنامهٔ موجود تغییر نکرد.",
+            );
+          await this.liara.call("/v1/projects", "POST", {
+            name: input.appName,
+            planID: appPlan.planId,
+            bundlePlanID: appPlan.bundleId,
+            platform: project.platform,
+            network: networkId,
+            readOnlyRootFilesystem: false,
+          });
+          this.resource(job, "app", input.appName, input.appName);
+          const details = await this.liara.call(
+            `/v1/projects/${encodeURIComponent(input.appName)}`,
           );
-        const existing: Record<string, string> = {};
-        for (const env of details.project.envs) {
           if (
-            typeof env.key !== "string" ||
-            typeof env.value !== "string" ||
-            env.encrypted ||
-            /^\*+$/.test(env.value)
+            details.project?.project_id !== input.appName ||
+            details.project?.type !== project.platform
           )
             throw new ProvisionError(
-              "مقدار یکی از تنظیمات موجود قابل حفظ نیست؛ تغییری ارسال نشد.",
+              "ساخت برنامه ارسال شد اما مشخصات آن قابل تأیید نیست.",
             );
-          existing[env.key] = env.value;
+          if (details.project.defaultSubdomain === false) {
+            if (!details.project._id)
+              throw new ProvisionError(
+                "شناسهٔ لازم برای فعال‌سازی آدرس سایت دریافت نشد.",
+              );
+            await this.liara.call(
+              `/v1/projects/${encodeURIComponent(details.project._id)}/default-subdomain/enable`,
+              "POST",
+            );
+          }
         }
-        const merged = { ...existing, ...variables };
-        registerSecrets(Object.values(merged));
-        this.vault.put(`app-env:${job.id}`, merged);
-        await this.liara.call("/v1/projects/update-envs", "POST", {
-          project: input.appName,
-          variables: Object.entries(merged).map(([key, value]) => ({
-            key,
-            value,
-          })),
-        });
-        const updated = await this.liara.call(
-          `/v1/projects/${encodeURIComponent(input.appName)}`,
+        if (demo) this.resource(job, "app", input.appName, input.appName);
+        // This permission only covers the exact app the user approved and we just created.
+        if (!demo) {
+          config.allowedApps = [
+            ...new Set([...config.allowedApps, input.appName]),
+          ];
+          this.persistManaged({ appId: input.appName });
+        }
+        this.step(
+          job,
+          "app",
+          "done",
+          demo
+            ? "شبیه‌سازی؛ برنامهٔ واقعی ساخته نشد"
+            : "برنامه با پلتفرم و پلن تأییدشده ایجاد شد",
         );
-        const keys = new Set(updated.project?.envs?.map((v: any) => v.key));
-        if (Object.keys(merged).some((k) => !keys.has(k)))
-          throw new ProvisionError(
-            "ثبت کامل نام تنظیمات تأیید نشد؛ انتشار متوقف شد.",
+        const variables: Record<string, string> = { ...input.env };
+        for (const [i, database] of input.databases.entries()) {
+          this.step(job, `db-${i}`, "running");
+          const { databases: plans } = await this.assertPrices(quote);
+          let databaseId = `demo-db-${job.id}-${i}`;
+          let details: any;
+          if (demo)
+            details = {
+              hostname: database.name,
+              root_password: `demo-only-${randomUUID()}`,
+              username: "root",
+              dbName: database.type === "postgres" ? "postgres" : "app",
+            };
+          else {
+            const result = await this.liara.call("/v1/databases", "POST", {
+              hostname: database.name,
+              type: database.type,
+              version: database.version,
+              planID: plans[i].planId,
+              bundlePlanID: plans[i].bundleId,
+              publicNetwork: false,
+              network: networkId,
+            });
+            if (typeof result.databaseID !== "string" || !result.databaseID)
+              throw new ProvisionError(
+                "ساخت دیتابیس ارسال شد ولی شناسه دریافت نشد؛ برای جلوگیری از ساخت تکراری متوقف شد.",
+              );
+            databaseId = result.databaseID;
+          }
+          this.resource(job, "database", databaseId, database.name);
+          if (!demo)
+            for (let attempt = 0; attempt < 60; attempt++) {
+              details = (
+                await this.liara.call(
+                  `/v1/databases/${encodeURIComponent(databaseId)}`,
+                )
+              ).database;
+              if (
+                details?.hostname !== database.name ||
+                details?.type !== database.type
+              )
+                throw new ProvisionError(
+                  "مشخصات دیتابیس ایجادشده با پیشنهاد تأییدشده یکسان نیست.",
+                );
+              if (["failed", "error"].includes(details.status))
+                throw new ProvisionError("آماده‌سازی دیتابیس ناموفق بود.");
+              if (
+                details.root_password &&
+                ["ready", "running", "active", "started"].includes(
+                  String(details.status).toLowerCase(),
+                )
+              )
+                break;
+              details = undefined;
+              await this.sleep(5000);
+            }
+          if (!details)
+            throw new ProvisionError(
+              "آماده‌شدن دیتابیس در زمان مجاز تأیید نشد؛ ساخت دوباره انجام نمی‌شود.",
+            );
+          const values = connectionValues(details, database);
+          for (const [env, part] of Object.entries(database.bindings))
+            variables[env] = values[part];
+          this.step(
+            job,
+            `db-${i}`,
+            "done",
+            demo
+              ? "اتصال نمایشی آماده شد"
+              : "دیتابیس خصوصی آماده و اطلاعات اتصال دریافت شد",
           );
+        }
+        registerSecrets(Object.values(variables));
+        this.step(job, "env", "running");
+        if (!demo) {
+          const details = await this.liara.call(
+            `/v1/projects/${encodeURIComponent(input.appName)}`,
+          );
+          if (!Array.isArray(details.project?.envs))
+            throw new ProvisionError(
+              "تنظیمات فعلی برنامه قابل خواندن نیست؛ برای جلوگیری از حذف تنظیمات، تغییری ارسال نشد.",
+            );
+          const existing: Record<string, string> = {};
+          for (const env of details.project.envs) {
+            if (
+              typeof env.key !== "string" ||
+              typeof env.value !== "string" ||
+              env.encrypted ||
+              /^\*+$/.test(env.value)
+            )
+              throw new ProvisionError(
+                "مقدار یکی از تنظیمات موجود قابل حفظ نیست؛ تغییری ارسال نشد.",
+              );
+            existing[env.key] = env.value;
+          }
+          const merged = { ...existing, ...variables };
+          registerSecrets(Object.values(merged));
+          this.vault.put(`app-env:${job.id}`, merged);
+          await this.liara.call("/v1/projects/update-envs", "POST", {
+            project: input.appName,
+            variables: Object.entries(merged).map(([key, value]) => ({
+              key,
+              value,
+            })),
+          });
+          const updated = await this.liara.call(
+            `/v1/projects/${encodeURIComponent(input.appName)}`,
+          );
+          const keys = new Set(updated.project?.envs?.map((v: any) => v.key));
+          if (Object.keys(merged).some((k) => !keys.has(k)))
+            throw new ProvisionError(
+              "ثبت کامل نام تنظیمات تأیید نشد؛ انتشار متوقف شد.",
+            );
+        }
+        if (demo) this.vault.put(`app-env:${job.id}`, variables);
+        if (!demo) this.persistManaged({ secretJobId: job.id });
+        this.step(
+          job,
+          "env",
+          "done",
+          "مقادیر در گزارش و گفتگو نمایش داده نمی‌شوند",
+        );
       }
-      if (demo) this.vault.put(`app-env:${job.id}`, variables);
-      if (!demo) this.persistManaged({ secretJobId: job.id });
-      this.step(
-        job,
-        "env",
-        "done",
-        "مقادیر در گزارش و گفتگو نمایش داده نمی‌شوند",
-      );
       this.step(job, "deploy", "running");
       const archive = await new Projects(this.db).archive(
         job.projectId,
@@ -845,7 +1094,7 @@ export class Provisioner {
         job.url = url;
         this.step(job, "verify", "running");
         let consecutive = 0;
-        for (let attempt = 0; attempt < 60; attempt++) {
+        for (let attempt = 0; attempt < 120; attempt++) {
           await this.sleep(5000);
           const releases = await this.liara.call(
             `/v1/projects/${encodeURIComponent(input.appName)}/releases?page=1&count=20`,
@@ -853,7 +1102,12 @@ export class Provisioner {
           const release = releases.releases?.find(
             (r: any) => r._id === job.releaseId,
           );
-          if (release && ["failed", "error"].includes(release.state))
+          if (
+            release &&
+            ["FAILED", "ERROR", "TIMEDOUT", "CANCELED", "UNHEALTHY"].includes(
+              String(release.state).toUpperCase(),
+            )
+          )
             throw new ProvisionError(
               "ساخت نسخه در لیارا ناموفق شد؛ لاگ ساخت را بررسی کنید.",
             );
@@ -915,9 +1169,23 @@ export class Provisioner {
         e instanceof ProvisionError || e instanceof LiaraError
           ? known
           : "ارتباط یا عملیات زیرساخت کامل نشد؛ نتیجهٔ مرحلهٔ آخر نیاز به بررسی دارد.";
+      job.errorCode =
+        e instanceof LiaraError && e.status === 402
+          ? "payment_required"
+          : e instanceof LiaraError &&
+              e.status === 400 &&
+              e.operation === "source_upload"
+            ? "source_rejected"
+            : "provider_error";
       job.status = "failed";
       job.nextStep =
         "مراحل و شناسهٔ منابع ساخته‌شده در همین صفحه ثبت شده‌اند. عملیات خودکار تکرار یا سرویس‌ها حذف نمی‌شوند؛ منابع ساخته‌شده تا توقف/حذف ممکن است هزینه داشته باشند. برای بررسی بیشتر از گفتگو و لاگ سرویس استفاده کنید.";
+      if (
+        job.errorCode === "payment_required" &&
+        !job.resources.some((r) => r.kind !== "network")
+      )
+        job.nextStep =
+          "هیچ برنامه یا دیتابیسی ساخته نشده است. پس از شارژ حساب، «بررسی دوبارهٔ هزینه» را بزنید؛ تنظیمات محرمانه حفظ می‌شوند و شبکهٔ قبلی دوباره ساخته نمی‌شود. برداشت بانکی در همراه انجام نمی‌شود.";
       for (const step of job.steps)
         if (step.status === "running") {
           step.status = "failed";

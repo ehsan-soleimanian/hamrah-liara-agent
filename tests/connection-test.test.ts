@@ -13,7 +13,7 @@ test("connection checks send credentials only to fixed read endpoints and return
       assert.equal(
         url,
         provider === "liara"
-          ? "https://api.liara.ir/v1/projects"
+          ? "https://api.liara.ir/v1/projects?teamID=test-team"
           : "https://api.cursor.com/v1/me",
       );
       assert.equal(options?.method, "GET");
@@ -22,10 +22,7 @@ test("connection checks send credentials only to fixed read endpoints and return
       assert.ok(options?.signal);
       const headers = new Headers(options?.headers);
       assert.equal(headers.get("Authorization"), "Bearer local-test-secret");
-      assert.equal(
-        headers.get("x-team-id"),
-        provider === "liara" ? "test-team" : null,
-      );
+      assert.equal(headers.get("x-team-id"), null);
       return Response.json(
         provider === "liara"
           ? { projects: [] }

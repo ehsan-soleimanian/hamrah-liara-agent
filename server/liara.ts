@@ -1,39 +1,75 @@
 import { config } from "./config.ts";
 import { redact } from "./security.ts";
+import { liaraFetch } from "./liara-transport.ts";
 import type { Service, Backup, Release } from "../src/types.ts";
 const safe = (s: string) => encodeURIComponent(s);
 export class LiaraError extends Error {
+  operation?: "source_upload" | "release_create";
   constructor(public status: number) {
-    super(`لیارا درخواست را نپذیرفت (HTTP ${status}).`);
+    super(
+      status === 402
+        ? "لیارا اعتبار حساب انتخاب‌شده را برای این عملیات نپذیرفت. ابتدا موجودی و انتخاب حساب شخصی یا تیم را بررسی کنید. (HTTP 402)"
+        : status === 401 || status === 403
+          ? `کلید یا دسترسی حساب لیارا اجازهٔ این عملیات را نمی‌دهد. اتصال و دسترسی تیم را بررسی کنید. (HTTP ${status})`
+          : status === 429
+            ? "تعداد درخواست‌ها به لیارا زیاد شده است؛ کمی بعد دوباره بررسی کنید. (HTTP 429)"
+            : `لیارا درخواست را نپذیرفت (HTTP ${status}).`,
+    );
   }
 }
 export class Liara {
   constructor(
     private token?: string,
-    private request: typeof fetch = fetch,
+    private request: typeof fetch = liaraFetch,
     private teamId = config.teamId,
   ) {}
   async call(endpoint: string, method = "GET", body?: unknown) {
     const token = this.token ?? config.liaraToken;
     if (!token) throw new Error("کلید API لیارا را در تنظیمات وارد کنید.");
-    const response = await this.request(`https://api.liara.ir${endpoint}`, {
-      method,
-      headers: {
-        Authorization: `Bearer ${token}`,
-        ...(body instanceof FormData
-          ? {}
-          : { "Content-Type": "application/json" }),
-        ...(this.teamId ? { "x-team-id": this.teamId } : {}),
-      },
-      body:
-        body instanceof FormData
-          ? body
-          : body === undefined
-            ? undefined
-            : JSON.stringify(body),
-      signal: AbortSignal.timeout(20000),
-      redirect: "error",
-    });
+    const url = new URL(endpoint, "https://api.liara.ir");
+    if (url.origin !== "https://api.liara.ir")
+      throw new Error("Invalid Liara endpoint");
+    // PaaS and DBaaS use the teamID query parameter (official console/CLI contract).
+    // A made-up team header is silently ignored and charges the personal account.
+    if (this.teamId) url.searchParams.set("teamID", this.teamId);
+    const send = () =>
+      this.request(url.toString(), {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          ...(body instanceof FormData
+            ? {}
+            : { "Content-Type": "application/json" }),
+        },
+        body:
+          body instanceof FormData
+            ? body
+            : body === undefined
+              ? undefined
+              : JSON.stringify(body),
+        signal: AbortSignal.timeout(20000),
+        redirect: "error",
+      });
+    let response: Response;
+    try {
+      response = await send();
+    } catch (error) {
+      if (method !== "GET") throw error;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      try {
+        response = await send();
+      } catch (retryError) {
+        const cause = (
+          retryError as Error & {
+            cause?: { code?: string; errors?: { code?: string }[] };
+          }
+        ).cause;
+        const code = cause?.code || cause?.errors?.[0]?.code || "NETWORK_ERROR";
+        throw new Error(
+          `ارتباط خواندنی با لیارا برقرار نشد (${/^[A-Z_0-9]+$/.test(code) ? code : "NETWORK_ERROR"}).`,
+        );
+      }
+    }
     if (!response.ok) throw new LiaraError(response.status);
     const text = await response.text();
     return text ? JSON.parse(text) : {};
@@ -59,7 +95,7 @@ export class Liara {
       source: "Liara logs API",
       text: redact(
         await this.call(
-          `/v1/projects/${safe(app)}/logs?since=${encodeURIComponent(new Date(Date.now() - 1800000).toISOString())}`,
+          `/v2/projects/${safe(app)}/logs?start=${Math.floor(Date.now() / 1000) - 1800}&direction=forward&last_lines=true`,
         ),
       ),
     };
@@ -119,17 +155,27 @@ export class Liara {
   ) {
     this.assertWritable(app);
     const form = new FormData();
-    form.append("file", new Blob([new Uint8Array(archive)]), "project.tar.gz");
+    form.append(
+      "file",
+      new Blob([new Uint8Array(archive)], { type: "application/gzip" }),
+      "project.tar.gz",
+    );
     const source = await this.call(
       `/v2/projects/${safe(app)}/sources`,
       "POST",
       form,
-    );
+    ).catch((error) => {
+      if (error instanceof LiaraError) error.operation = "source_upload";
+      throw error;
+    });
     if (!source.sourceID) throw new Error("لیارا شناسهٔ سورس را برنگرداند.");
     return this.call(`/v2/projects/${safe(app)}/releases`, "POST", {
       sourceID: source.sourceID,
       port: options.port,
       type: options.type,
+    }).catch((error) => {
+      if (error instanceof LiaraError) error.operation = "release_create";
+      throw error;
     });
   }
   assertWritable(app: string) {

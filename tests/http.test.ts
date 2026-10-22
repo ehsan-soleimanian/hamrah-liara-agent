@@ -60,7 +60,7 @@ async function startServer() {
       )
         break;
     } catch {}
-    if (Date.now() - start > 15000) throw new Error(output);
+    if (Date.now() - start > 60000) throw new Error(output);
     await delay(100);
   }
 }

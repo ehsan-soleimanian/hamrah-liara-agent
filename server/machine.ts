@@ -7,7 +7,7 @@ const allowed: Record<IncidentStatus, IncidentStatus[]> = {
   EXECUTING: ["VERIFYING", "ESCALATED"],
   VERIFYING: ["RESOLVED", "ESCALATED"],
   RESOLVED: [],
-  ESCALATED: ["VERIFYING"],
+  ESCALATED: ["VERIFYING", "INVESTIGATING"],
   REJECTED: ["VERIFYING"],
 };
 export function transition(

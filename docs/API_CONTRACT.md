@@ -4,10 +4,12 @@
 
 Base URL ثابت: `https://api.liara.ir`؛ احراز هویت: `Authorization: Bearer <LIARA_API_TOKEN>`.
 
+در خطای قطعی `EAI_AGAIN`/`ENOTFOUND` پیش از برقراری TCP، transport می‌تواند نام عمومی API را با resolver ایرانی حل کند؛ TLS همچنان `api.liara.ir` را با `rejectUnauthorized: true` اعتبارسنجی می‌کند. پاسخ DNS حداکثر ۶۰ ثانیه cache می‌شود. DNS سیستم، hosts file و تنظیمات گواهی تغییر نمی‌کنند. این fallback برای timeout/reset یا نتیجهٔ نامشخص mutation فعال نمی‌شود.
+
 | کاربرد         | روش و مسیر                                         | وضعیت در MVP                                         |
 | -------------- | -------------------------------------------------- | ---------------------------------------------------- |
 | فهرست برنامه   | `GET /v1/projects`                                 | پیاده‌سازی؛ شناسهٔ قابل استفاده `project_id`         |
-| لاگ برنامه     | `GET /v1/projects/{name}/logs?since=...`           | پیاده‌سازی؛ since به ISO timestamp تبدیل می‌شود      |
+| لاگ برنامه     | `GET /v2/projects/{name}/logs?start=...&direction=forward&last_lines=true` | start به ثانیهٔ Unix؛ آزموده‌شده در اتصال واقعی |
 | منابع          | `GET /v1/projects/{name}/metrics/summary`          | ابزار خواندنی Cursor                                 |
 | ری‌استارت      | `POST /v1/projects/{name}/actions/restart`         | پس از تأیید و allowlist                              |
 | دریافت نسخه‌ها | `GET /v1/projects/{name}/releases?page=1&count=20` | نمایش و بررسی currentRelease                         |
@@ -16,7 +18,11 @@ Base URL ثابت: `https://api.liara.ir`؛ احراز هویت: `Authorization:
 | فهرست پشتیبان  | `GET /v1/databases/{id}/backups`                   | نمایش نام، زمان و حجم                                |
 | تهیهٔ پشتیبان  | `POST /v1/databases/{id}/backups`                  | تأیید کاربر؛ پذیرش asynchronous اعلام می‌شود         |
 
-`LIARA_TEAM_ID` اختیاری، از طریق `x-team-id` ارسال می‌شود. اگر حساب تیم شما قرارداد header متفاوتی داشته باشد، باید با پاسخ واقعی حساب تأیید شود؛ اتصال تیم بدون کلید تست نشده است.
+`LIARA_TEAM_ID` اختیاری، به‌صورت پارامتر query با نام `teamID` روی تمام درخواست‌های PaaS/DBaaS ارسال می‌شود؛ هدر `x-team-id` توسط سرویس نادیده گرفته می‌شد و نباید استفاده شود. این قرارداد در آزمون واقعی تیم «لیارا» تأیید شد. پاسخ `/v1/me` باید شناسهٔ همان تیم را بازگرداند؛ در غیر این صورت اتصال/پیشنهاد هزینه متوقف می‌شود. فهرست حساب‌ها از `/v2/teams` و موجودی حساب انتخاب‌شده از `/v1/billing?teamID=...` خوانده می‌شود.
+
+لاگ اجرای فعلی از `GET /v2/projects/{name}/logs?start=<unix-seconds>&direction=forward&last_lines=true` دریافت می‌شود. مسیر قبلی v1 در آزمون زنده HTTP 400 داد. لاگ ساخت از `GET /v2/releases/{releaseID}/build-logs?since=<timestamp>` و با cursor خوانده می‌شود. فایل source باید در multipart همراه MIME `application/gzip` ارسال شود.
+
+ادامهٔ امن انتشار پس از شکست آپلود: `POST /api/provision/:id/continue` فقط پیشنهاد تازه می‌سازد و نیازمند تأیید تازه است؛ حساب، سورس، تنظیمات موجود و نبود نسخهٔ پیشین بررسی می‌شوند و برنامه/دیتابیس دوباره ساخته نمی‌شوند. `POST /api/provision/:id/recheck` فقط نتیجهٔ همان release را با دو probe بررسی می‌کند؛ انتشار یا ساخت منابع انجام نمی‌دهد.
 
 به پاسخ موفق یا JSON معتبر اعتماد کور نمی‌شود: فهرست برنامه باید projects داشته باشد؛ ارسال سورس باید sourceID و انتشار باید releaseID برگرداند. پاسخ‌های ۴۰۱، ۴۰۳، ۴۰۴، ۴۲۹ یا ۵۰۰ به پیام خطا تبدیل می‌شوند و با دادهٔ demo جایگزین نمی‌شوند. خطاهای کامل بعد از حذف مقادیر حساس محدود می‌شوند. timeout هر درخواست لیارا ۲۰ ثانیه است؛ retry کور روی mutation نداریم.
 

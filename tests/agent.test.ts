@@ -28,6 +28,7 @@ async function until(check: () => boolean, timeout = 8000) {
 }
 before(async () => {
   config.mode = "demo";
+  config.teamId = "";
   config.demoUrl = "http://127.0.0.1:3052";
   config.demoToken = "hamrah-test-token";
   config.dataDir = dir;

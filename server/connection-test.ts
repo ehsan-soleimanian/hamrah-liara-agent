@@ -1,4 +1,5 @@
 export type ConnectionProvider = "liara" | "cursor";
+import { liaraFetch } from "./liara-transport.ts";
 
 export class ConnectionTestError extends Error {
   constructor(
@@ -26,16 +27,17 @@ export async function testConnection(
   let response: Response;
   let data: unknown;
   try {
-    response = await request(
+    response = await (
+      provider === "liara" && request === fetch ? liaraFetch : request
+    )(
       provider === "liara"
-        ? "https://api.liara.ir/v1/projects"
+        ? `https://api.liara.ir/v1/projects${teamId ? `?teamID=${encodeURIComponent(teamId)}` : ""}`
         : "https://api.cursor.com/v1/me",
       {
         method: "GET",
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: "application/json",
-          ...(provider === "liara" && teamId ? { "x-team-id": teamId } : {}),
         },
         redirect: "error",
         signal: AbortSignal.timeout(timeoutMs),

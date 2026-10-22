@@ -605,7 +605,10 @@ export class Engine {
   async investigate(id: string) {
     try {
       this.move(id, "INVESTIGATING", "در حال جمع‌آوری لاگ و بررسی مسیر سفارش");
-      const logs = await this.logs();
+      const logs = await this.logs().catch((e) => ({
+        source: "unavailable",
+        text: `لاگ فعلاً قابل دریافت نیست: ${redact((e as Error).message)}`,
+      }));
       const incident = this.db.get<Incident>("incidents", id)!;
       this.db.put("incidents", {
         ...incident,

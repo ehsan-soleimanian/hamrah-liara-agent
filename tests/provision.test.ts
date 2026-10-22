@@ -121,7 +121,10 @@ function setup(mode: "demo" | "live" = "live") {
     dbCreated = false,
     envs = [{ key: "DEFAULT_VALUE", value: "keep-this" }],
     priceChange = false,
-    failDatabase = false;
+    failDatabase = false,
+    failPayment = false,
+    failSource = false,
+    releaseSubmitted = false;
   const liara = new Liara();
   liara.call = async (endpoint, method = "GET", body?: any) => {
     calls.push({ endpoint, method, body });
@@ -137,6 +140,7 @@ function setup(mode: "demo" | "live" = "live") {
         projects: appCreated ? [{ project_id: "new-shop", type: "node" }] : [],
       };
     if (endpoint === "/v1/projects" && method === "POST") {
+      if (failPayment) throw new LiaraError(402);
       appCreated = true;
       return {};
     }
@@ -174,16 +178,22 @@ function setup(mode: "demo" | "live" = "live") {
       return {};
     }
     if (endpoint.includes("/sources")) {
+      if (failSource) throw new LiaraError(400);
       assert.ok(body instanceof FormData);
       assert.ok(body.get("file") instanceof Blob);
+      assert.equal((body.get("file") as Blob).type, "application/gzip");
       return { sourceID: "source-id" };
     }
-    if (endpoint.endsWith("/releases") && method === "POST")
+    if (endpoint.endsWith("/releases") && method === "POST") {
+      releaseSubmitted = true;
       return { releaseID: "exact-new-release" };
+    }
     if (endpoint.includes("/releases?"))
       return {
-        currentRelease: "exact-new-release",
-        releases: [{ _id: "exact-new-release", state: "ready" }],
+        currentRelease: releaseSubmitted ? "exact-new-release" : null,
+        releases: releaseSubmitted
+          ? [{ _id: "exact-new-release", state: "ready" }]
+          : [],
       };
     throw new Error(`Unmocked endpoint ${endpoint}`);
   };
@@ -223,6 +233,12 @@ function setup(mode: "demo" | "live" = "live") {
     },
     setDatabaseFailure() {
       failDatabase = true;
+    },
+    setPaymentFailure() {
+      failPayment = true;
+    },
+    setSourceFailure(value: boolean) {
+      failSource = value;
     },
     close() {
       engine.stop();
@@ -511,6 +527,128 @@ test("account changes invalidate spending approval but still allow cancelling a 
       false,
     );
   } finally {
+    s.close();
+  }
+});
+
+test("payment rejection is actionable and creates no paid resources; requote is read-only and preserves encrypted inputs", async () => {
+  const s = setup();
+  try {
+    s.setPaymentFailure();
+    const quote = await s.provision.quote(s.input);
+    await s.provision.approve(quote.id, quote.fingerprint, true);
+    await settled(s.provision);
+    const failed = s.provision.get(quote.id);
+    assert.equal(failed.errorCode, "payment_required");
+    assert.match(failed.error!, /اعتبار/);
+    assert.equal(
+      failed.resources.filter((r) => r.kind !== "network").length,
+      0,
+    );
+    // Simulates a network created before a definitive app-create rejection.
+    s.db.put("provisionJobs", {
+      ...failed,
+      resources: [{ kind: "network", id: "private-network", name: "shared" }],
+    });
+    const before = s.calls.length;
+    const fresh = await s.provision.requote(quote.id);
+    assert.equal(fresh.status, "pending");
+    assert.notEqual(fresh.fingerprint, quote.fingerprint);
+    assert.ok(s.calls.slice(before).every((c) => c.method === "GET"));
+    const secret = s.vault.get<any>(`quote:${fresh.id}`);
+    assert.equal(secret.input.env.SERVICE_KEY, s.input.env.SERVICE_KEY);
+    assert.equal(secret.input.networkId, "private-network");
+    assert.ok(!JSON.stringify(fresh).includes(s.input.env.SERVICE_KEY));
+    config.liaraToken = "other-account";
+    await assert.rejects(() => s.provision.requote(quote.id), /حساب/);
+  } finally {
+    s.close();
+  }
+});
+
+test("recovery never replays partially created paid resources or ambiguous failures", async () => {
+  const s = setup();
+  try {
+    const quote = await s.provision.quote(s.input);
+    s.db.put("provisionJobs", {
+      ...quote,
+      status: "failed",
+      errorCode: "payment_required",
+      resources: [{ kind: "app", id: "new-shop", name: "new-shop" }],
+    });
+    await assert.rejects(() => s.provision.requote(quote.id), /ساخت دوباره/);
+    s.db.put("provisionJobs", {
+      ...quote,
+      status: "failed",
+      errorCode: "provider_error",
+      error: "timeout",
+    });
+    await assert.rejects(() => s.provision.requote(quote.id), /ساخت دوباره/);
+    assert.ok(s.calls.every((c) => c.method === "GET"));
+  } finally {
+    s.close();
+  }
+});
+
+test("known source rejection can continue only deployment after a fresh approval, without recreating infrastructure", async () => {
+  const s = setup(),
+    originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({ ok: true });
+  try {
+    s.setSourceFailure(true);
+    const first = await s.provision.quote(s.input);
+    await s.provision.approve(first.id, first.fingerprint, true);
+    await settled(s.provision);
+    assert.equal(s.provision.get(first.id).status, "failed");
+    s.setSourceFailure(false);
+    const start = s.calls.length;
+    const next = await s.provision.continueDeployment(first.id);
+    assert.equal(next.status, "pending");
+    assert.equal(next.continuationOf, first.id);
+    assert.ok(s.calls.slice(start).every((c) => c.method === "GET"));
+    await s.provision.approve(next.id, next.fingerprint, true);
+    await settled(s.provision);
+    assert.equal(s.provision.get(next.id).status, "completed");
+    assert.equal(
+      s.calls.filter(
+        (c) => c.endpoint === "/v1/projects" && c.method === "POST",
+      ).length,
+      1,
+    );
+    assert.equal(
+      s.calls.filter(
+        (c) => c.endpoint === "/v1/databases" && c.method === "POST",
+      ).length,
+      1,
+    );
+    await assert.rejects(
+      () => s.provision.continueDeployment(first.id),
+      /نسخه/,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    s.close();
+  }
+});
+
+test("a slow cloud release can be rechecked without a new deploy or infrastructure mutation", async () => {
+  const s = setup(),
+    previousFetch = globalThis.fetch;
+  globalThis.fetch = async () => new Response("", { status: 503 });
+  try {
+    const q = await s.provision.quote(s.input);
+    await s.provision.approve(q.id, q.fingerprint, true);
+    await settled(s.provision);
+    assert.equal(s.provision.get(q.id).status, "failed");
+    assert.equal(s.provision.get(q.id).releaseId, "exact-new-release");
+    const start = s.calls.length;
+    globalThis.fetch = async () => Response.json({ ok: true });
+    const verified = await s.provision.recheckDeployment(q.id);
+    assert.equal(verified.status, "completed");
+    assert.ok(s.calls.slice(start).every((c) => c.method === "GET"));
+    assert.equal(config.appId, "new-shop");
+  } finally {
+    globalThis.fetch = previousFetch;
     s.close();
   }
 });

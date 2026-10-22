@@ -7,6 +7,7 @@ import {
 } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
+import LiaraAccount from "./LiaraAccount";
 import {
   Activity,
   ArrowDownLeft,
@@ -489,7 +490,9 @@ export default function App() {
           </span>
           <span>
             <strong>{state.settings.businessName}</strong>
-            <small>فضای کاری شخصی</small>
+            <small>
+              {state.connections.teamId ? "فضای کاری تیمی" : "فضای کاری شخصی"}
+            </small>
           </span>
           <ChevronDown size={15} />
         </button>
@@ -981,7 +984,11 @@ export default function App() {
                       </span>
                       <div className="incident-row-body">
                         <h3>{i.title}</h3>
-                        <p>{i.diagnosis || i.summary}</p>
+                        <p>
+                          {i.status === "RESOLVED"
+                            ? i.timeline.at(-1)?.note
+                            : i.diagnosis || i.summary}
+                        </p>
                         <small>
                           {date(i.createdAt)}، {time(i.createdAt)} ·{" "}
                           {i.source === "demo" ? "فروشگاه آزمایشی" : "لیارا"}
@@ -1585,13 +1592,32 @@ export default function App() {
                 <Search size={22} />
               </span>
               <div>
-                <h3>چه اتفاقی افتاده؟</h3>
+                <h3>
+                  {currentIncident.status === "RESOLVED"
+                    ? "تحلیل ثبت‌شده در زمان اختلال"
+                    : "چه اتفاقی افتاده؟"}
+                </h3>
                 <p>{currentIncident.diagnosis || currentIncident.summary}</p>
                 {currentIncident.confidence && (
                   <small>{currentIncident.confidence}</small>
                 )}
               </div>
             </div>
+            {currentIncident.status === "ESCALATED" && (
+              <button
+                className="button secondary"
+                disabled={!!busy}
+                onClick={() =>
+                  run(
+                    "investigate",
+                    () => api(`/incidents/${currentIncident.id}/investigate`),
+                    "شواهد و تحلیل دوباره بررسی شد",
+                  )
+                }
+              >
+                جمع‌آوری دوبارهٔ شواهد و تحلیل
+              </button>
+            )}
             <div className="timeline">
               {currentIncident.timeline.map((step, i) => (
                 <div className="timeline-item" key={`${step.status}-${i}`}>
@@ -2614,6 +2640,10 @@ function SettingsPage({
         <SectionHeading
           title="اتصال‌های همراه"
           subtitle="کلیدهای لیارا و Cursor را همین‌جا ذخیره کنید؛ مقادیر ذخیره‌شده دوباره نمایش داده نمی‌شوند."
+        />
+        <LiaraAccount
+          teamId={state.connections.teamId}
+          enabled={state.mode === "live" && state.connections.liara}
         />
         <form
           className="liara-key-form mode-form"

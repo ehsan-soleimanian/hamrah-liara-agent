@@ -15,6 +15,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { api, fa } from "./lib";
+import LiaraAccount from "./LiaraAccount";
 import type { Snapshot } from "./types";
 import type { ProjectReport } from "./project-types";
 import type {
@@ -39,7 +40,7 @@ const partLabels: Record<string, string> = {
   database: "نام دیتابیس",
 };
 const money = (value: number) =>
-  new Intl.NumberFormat("fa-IR", { maximumFractionDigits: 2 }).format(value);
+  new Intl.NumberFormat("fa-IR", { maximumFractionDigits: 0 }).format(value);
 function suggestedType(name: string): DatabaseType | undefined {
   return (
     {
@@ -144,7 +145,7 @@ export default function ProvisionFlow({
     void loadCatalog();
     setQuote(null);
     setSelectedJob(null);
-  }, [state.mode, state.connections.liara]);
+  }, [state.mode, state.connections.liara, state.connections.teamId]);
   useEffect(() => {
     if (!catalog) return;
     setAppPlan((current) =>
@@ -189,6 +190,15 @@ export default function ProvisionFlow({
       setAgreed(false);
     }
   }, [job?.id, job?.status, selectedJob]);
+  useEffect(() => {
+    if (
+      quote &&
+      jobs.some((j) => j.id === quote.id && j.status !== "pending")
+    ) {
+      setQuote(null);
+      setAgreed(false);
+    }
+  }, [jobs, quote]);
   async function connect(mode: "demo" | "live") {
     setBusy(true);
     setError("");
@@ -308,6 +318,14 @@ export default function ProvisionFlow({
           {state.mode === "demo" ? "اتصال به حساب واقعی" : "تغییر اتصال"}
         </button>
       </div>
+      <LiaraAccount
+        teamId={state.connections.teamId}
+        enabled={
+          state.connections.liara &&
+          state.mode === "live" &&
+          job?.status !== "running"
+        }
+      />
       {showConnection && (
         <form
           className="intake-config intake-fields"
@@ -779,20 +797,25 @@ export default function ProvisionFlow({
             {quote.items.map((item) => (
               <div key={item.label}>
                 <span>{item.label}</span>
-                <strong>{money(item.monthly)} تومان</strong>
+                <strong>{money(item.monthly / 720)} تومان / ساعت</strong>
               </div>
             ))}
             <div className="provision-price-total">
-              <span>برآورد ۳۰ روز استفاده</span>
+              <span>برآورد هر ساعت استفاده</span>
               <strong>
-                {money(quote.monthly)} <small>تومان</small>
+                {money(quote.monthly / 720)} <small>تومان / ساعت</small>
               </strong>
             </div>
           </div>
           <p className="provision-price-note">
+            برآورد یک روز: {money(quote.monthly / 30)} تومان · ۳۰ روز:{" "}
+            {money(quote.monthly)} تومان. این اعداد پیش‌پرداخت یک ماه نیستند؛
+            سرویس تا زمان حذف یا تغییر وضعیت می‌تواند هزینه داشته باشد.
+          </p>
+          <p className="provision-price-note">
             {quote.mode === "demo"
               ? "این اعداد نمونه‌اند و تعرفهٔ واقعی لیارا نیستند؛ هیچ مبلغی پرداخت نمی‌شود."
-              : "منبع تعرفه: حساب فعلی شما در لیارا؛ ۷۲۰ ساعت منابع به‌علاوهٔ بستهٔ امکانات. مبلغ نهایی به زمان استفاده و هزینه‌های متغیر مثل ترافیک و مالیات بستگی دارد. مصرف از اعتبار حساب لیارا خواهد بود؛ پرداخت بانکی خودکار انجام نمی‌شود."}
+              : "منبع تعرفه: حساب فعلی شما در لیارا؛ منابع و بستهٔ امکانات با هم محاسبه شده‌اند. نرخ ساعتی از برآورد ۷۲۰ ساعته به دست آمده است. مبلغ نهایی به زمان استفاده و هزینه‌های متغیر مثل ترافیک و مالیات بستگی دارد. مصرف از اعتبار حساب لیارا خواهد بود؛ پرداخت بانکی خودکار انجام نمی‌شود."}
           </p>
           <ol className="provision-review-steps">
             {quote.steps.map((s) => (
@@ -854,17 +877,19 @@ export default function ProvisionFlow({
       {active && (
         <section className="provision-progress" aria-live="polite">
           <h3>
-            {job.status === "running"
-              ? "همراه مشغول راه‌اندازی است…"
-              : job.status === "completed"
-                ? job.mode === "demo"
-                  ? "پیش‌نمایش راه‌اندازی کامل شد"
-                  : "سایت شما آماده است"
-                : job.status === "needs_verification"
-                  ? "سایت منتشر شد؛ بررسی عمیق‌تر باقی است"
-                  : job.status === "rejected"
-                    ? "با تصمیم شما اجرا نشد"
-                    : "راه‌اندازی نیاز به بررسی دارد"}
+            {job.retiredAt
+              ? "آزمون تمام شد؛ برنامه و دیتابیس آزمایشی حذف شدند"
+              : job.status === "running"
+                ? "همراه مشغول راه‌اندازی است…"
+                : job.status === "completed"
+                  ? job.mode === "demo"
+                    ? "پیش‌نمایش راه‌اندازی کامل شد"
+                    : "سایت شما آماده است"
+                  : job.status === "needs_verification"
+                    ? "سایت منتشر شد؛ بررسی عمیق‌تر باقی است"
+                    : job.status === "rejected"
+                      ? "با تصمیم شما اجرا نشد"
+                      : "راه‌اندازی نیاز به بررسی دارد"}
           </h3>
           <ol>
             {job.steps.map((s) => (
@@ -898,7 +923,10 @@ export default function ProvisionFlow({
             ))}
           </ol>
           {job.verification && (
-            <p className="provision-result">{job.verification}</p>
+            <p className="provision-result">
+              {job.retiredAt ? "تأیید ثبت‌شده هنگام آزمون: " : ""}
+              {job.verification}
+            </p>
           )}
           {job.error && (
             <p className="inline-error" role="alert">
@@ -906,7 +934,110 @@ export default function ProvisionFlow({
             </p>
           )}
           {job.nextStep && <p className="provision-warning">{job.nextStep}</p>}
-          {job.resources.some((r) => r.kind === "app") && (
+          {job.releaseId && !job.retiredAt && (
+            <div className="wizard-buttons">
+              <button
+                className="text-button"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  setError("");
+                  try {
+                    const result = await api<{ text: string }>(
+                      `/provision/${job.id}/build-logs`,
+                      undefined,
+                      "GET",
+                    );
+                    setLogs(result.text);
+                  } catch (e) {
+                    setError((e as Error).message);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                دیدن لاگ ساخت نسخه
+              </button>
+              {job.status === "failed" && (
+                <button
+                  className="button primary"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    setError("");
+                    try {
+                      await api(`/provision/${job.id}/recheck`, {});
+                    } catch (e) {
+                      setError((e as Error).message);
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  بررسی دوبارهٔ نتیجه؛ بدون انتشار مجدد
+                </button>
+              )}
+            </div>
+          )}
+          {job.status === "failed" &&
+            job.errorCode === "source_rejected" &&
+            !job.releaseId &&
+            job.steps.find((s) => s.status === "failed")?.key === "deploy" &&
+            job.steps.find((s) => s.key === "env")?.status === "done" && (
+              <button
+                className="button primary"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  setError("");
+                  try {
+                    const fresh = await api<ProvisionJob>(
+                      `/provision/${job.id}/continue`,
+                      {},
+                    );
+                    setSelectedJob(fresh.id);
+                    setQuote(fresh);
+                    setAgreed(false);
+                  } catch (e) {
+                    setError((e as Error).message);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                ادامه از انتشار؛ بدون ساخت مجدد
+              </button>
+            )}
+          {job.status === "failed" &&
+            (job.errorCode === "payment_required" ||
+              job.error?.includes("HTTP 402")) &&
+            !job.resources.some((r) => r.kind !== "network") && (
+              <button
+                className="button primary"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  setError("");
+                  try {
+                    const fresh = await api<ProvisionJob>(
+                      `/provision/${job.id}/requote`,
+                      {},
+                    );
+                    setSelectedJob(fresh.id);
+                    setQuote(fresh);
+                    setAgreed(false);
+                  } catch (e) {
+                    setError((e as Error).message);
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                <RefreshCw size={17} />
+                بررسی دوبارهٔ هزینه پس از شارژ
+              </button>
+            )}
+          {!job.retiredAt && job.resources.some((r) => r.kind === "app") && (
             <>
               <button
                 className="text-button"
@@ -936,7 +1067,7 @@ export default function ProvisionFlow({
               )}
             </>
           )}
-          {job.url && (
+          {job.url && !job.retiredAt && (
             <a
               className="button primary"
               href={job.url}

@@ -71,6 +71,13 @@ export interface ProvisionJob {
   url?: string;
   releaseId?: string;
   error?: string;
+  errorCode?:
+    | "payment_required"
+    | "provider_error"
+    | "verification_failed"
+    | "source_rejected";
+  continuationOf?: string;
+  retiredAt?: string;
   nextStep?: string;
   verification?: string;
 }
