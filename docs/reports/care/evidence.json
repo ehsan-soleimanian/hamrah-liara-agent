@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-22T18:24:48.483545+00:00",
+  "generatedAt": "2026-10-22T18:29:30.478765+00:00",
   "tests": {
     "total": 84,
     "passed": 84,
@@ -306,9 +306,15 @@
     "careAvailable": true
   },
   "newCloudResourcesCreated": false,
+  "responsive": {
+    "desktopWidth": 1280,
+    "mobileWidth": 390,
+    "mobileDocumentWidth": 375,
+    "mobileMenu": true,
+    "backupTableScrollContained": true
+  },
   "limitations": [
     "No fresh cloud deployment or real PostgreSQL run in this change; provider and SQL fixtures are distinct from live execution.",
-    "The sample recovery contract covers orders only, up to 10000 rows / 4 MB, stored encrypted on this device.",
-    "Mobile layout was observed initially; the browser tool did not consistently apply the requested 390px override, so a 390px visual pass is not claimed."
+    "The sample recovery contract covers orders only, up to 10000 rows / 4 MB, stored encrypted on this device."
   ]
 }
