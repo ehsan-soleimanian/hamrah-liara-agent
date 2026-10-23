@@ -1,5 +1,13 @@
 # گزارش بررسی — ۲۲ اکتبر ۲۰۲۶
 
+## پیشنهاد پکیج Cursor و خطای اتصال — ۲۳ اکتبر ۲۰۲۶
+
+**۹۵ تست موفق، صفر شکست**؛ ساخت TypeScript/Vite موفق. پیشنهاد پکیج اکنون از جلسهٔ ابزارمحور Cursor می‌آید. دریافت سورس، بررسی مدل، خطای اتصال و پیشنهاد معتبر در رابط وضعیت جدا دارند. بستهٔ انتخابی به فرم ساخت سرویس و quote منتقل و با حساب و هش سورس اعتبارسنجی می‌شود. [شرح قرارداد و محدودیت‌ها](CURSOR-RECOMMENDATIONS.md).
+
+اتصال واقعی در این نوبت با رد منطقه‌ای Cursor بازتولید شد. به درخواست کاربر، کد و رابط تکمیل شدند؛ موفقیت پیشنهاد زنده ادعا نمی‌شود. مسیر موفق ابزارها و quote با SDK/API شبیه‌سازی‌شده در فرایند ایزوله تست شد. زیرساخت پولی ساخته نشد. سوابق اجرای واقعی ابر در بخش‌های پایین مربوط به نوبت‌های قبل‌اند.
+
+در مرورگر، ورود GitHub در محیط ایزوله، نمایش دو بسته، انتخاب بستهٔ دوم و انتقال همان اندازهٔ برنامه و PostgreSQL و اتصال خودکار `DATABASE_URL` بررسی شد. پیش‌نمایش هزینهٔ همان بسته به تأیید مستقل رسید و دکمهٔ ساخت بدون انتخاب تأیید غیرفعال ماند؛ اجرا تأیید نشد. در عرض ۳۹۰ پیکسل سرریز افقی و در کنسول خطا یا هشدار JavaScript مشاهده نشد. خطای واقعی منطقه‌ای نیز با دکمهٔ تلاش دوباره و بدون پیشنهاد جایگزین نمایش داده شد. تصاویر بررسی در `artifacts/cursor-fix/ui/` محلی و خارج از Git هستند.
+
 ## اصلاح شروع راه‌اندازی — ۲۳ اکتبر ۲۰۲۶
 
 بارگذاری خودکار پروژهٔ ذخیره‌شده، فرم ورود لینک گیت‌هاب را پشت مرحلهٔ تحلیل پنهان می‌کرد. اکنون فرم مرحلهٔ اول بلافاصله نمایش داده می‌شود؛ سابقهٔ قبلی فقط با «ادامهٔ پروژهٔ قبلی» باز می‌شود و در بالای تحلیل، «واردکردن پروژهٔ جدید» در دسترس است. دریافت سابقه در پس‌زمینه است و تأخیر یا خطای آن فرم را متوقف نمی‌کند.
@@ -80,3 +88,12 @@
 - Production build passed. Responsive browser workflow tested on isolated demo data; no custom-domain live mutation or SSL issuance claimed.
 - Real Liara DNS GET /zones returned HTTP 200, zero zones in selected team. No zone or paid resource was created for this implementation.
 - Detailed scope and API provenance: DOMAINS.md. Domain report: reports/domains/report.html.
+
+## Resource monitoring and approved resizing — 2026-10-23
+
+- Full sequential suite: 110 passed, 0 failed. Final targeted monitoring/resource/HTTP suite: 15 passed, 0 failed after the last changes.
+- Production build, including TypeScript checking, passed.
+- Browser test in an isolated fixture verified the regional Cursor notice, resource thresholds and readings, plan retrieval/selection, cost and impact preview, explicit approval, operation progress and completion. A wrong HTTP method in the plan retrieval button was found in the browser and fixed before completion.
+- The fixture simulates all external API responses and writes. No live resize or successful live Cursor run is claimed. Screenshot: screenshots/monitoring/resource-approval.png.
+- The existing development server was restarted after confirming no active action or provision job; the new API and frontend were checked at their existing ports.
+- See MONITORING.md for metric unit requirements, retention, diagnosis uncertainty, cost validation and unsupported operations.

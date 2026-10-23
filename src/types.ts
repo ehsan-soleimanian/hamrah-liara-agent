@@ -9,6 +9,7 @@ export type IncidentStatus =
   | "ESCALATED"
   | "REJECTED";
 export type ActionKind =
+  | "resize_app"
   | "restart_app"
   | "deploy_release"
   | "restore_backup"
@@ -27,6 +28,10 @@ export interface TimelineStep {
   note: string;
 }
 export interface Incident {
+  category?: "availability" | "performance";
+  performanceKeys?: string[];
+  scope?: string;
+  hypotheses?: import("./monitoring-types").Hypothesis[];
   id: string;
   appId: string;
   title: string;
@@ -90,6 +95,7 @@ export interface Probe {
   healthOk: boolean;
   businessOk: boolean;
   latency: number;
+  healthLatency?: number;
   statusCode: number;
   error?: string;
 }
@@ -156,11 +162,13 @@ export interface Release {
   source: "demo" | "live";
 }
 export interface Settings {
+  resourcePolicy?: import("./monitoring-types").MonitorPolicy;
   monitoring: boolean;
   notify: boolean;
   businessName: string;
 }
 export interface Snapshot {
+  monitoring?: import("./monitoring-types").MonitoringState;
   care?: CareState;
   mode: "demo" | "live";
   managedAppId: string;
@@ -175,6 +183,14 @@ export interface Snapshot {
   releases: Release[];
   settings: Settings;
   connections: {
+    cursorStatus?: {
+      ok: boolean;
+      checkedAt: string;
+      model: string;
+      code?: string;
+      message?: string;
+      proof?: string;
+    };
     liara: boolean;
     cursor: boolean;
     writable: boolean;

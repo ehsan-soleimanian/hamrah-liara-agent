@@ -1,5 +1,8 @@
 export type ConnectionProvider = "liara" | "cursor";
 import { liaraFetch } from "./liara-transport.ts";
+import { cursorFailure } from "./cursor-errors.ts";
+import { config } from "./config.ts";
+import { configureCursorNetwork, cursorProxyFetch } from "./cursor-network.ts";
 
 export class ConnectionTestError extends Error {
   constructor(
@@ -27,8 +30,10 @@ export async function testConnection(
   let response: Response;
   let data: unknown;
   try {
+    if (provider === "cursor" && request === fetch && config.cursorProxyUrl)
+      configureCursorNetwork(config.cursorProxyUrl);
     response = await (
-      provider === "liara" && request === fetch ? liaraFetch : request
+      provider === "liara" && request === fetch ? liaraFetch : provider === "cursor" && request === fetch && config.cursorProxyUrl ? cursorProxyFetch : request
     )(
       provider === "liara"
         ? `https://api.liara.ir/v1/projects${teamId ? `?teamID=${encodeURIComponent(teamId)}` : ""}`
@@ -50,6 +55,13 @@ export async function testConnection(
           `کلید ${label} پذیرفته نشد؛ کلید اشتباه، منقضی یا لغو شده است.`,
           422,
         );
+      if (response.status === 403 && provider === "cursor") {
+        const failure = cursorFailure(
+          new Error((await response.text()).slice(0, 4096)),
+        );
+        if (failure.code === "region_blocked")
+          throw new ConnectionTestError(failure.message, failure.httpStatus);
+      }
       if (response.status === 403)
         throw new ConnectionTestError(
           `دسترسی این کلید در ${label} کافی نیست؛ مجوزهای حساب${provider === "liara" ? " و تیم" : ""} را بررسی کنید.`,

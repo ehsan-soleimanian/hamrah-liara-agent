@@ -5,6 +5,7 @@ import { Liara, LiaraError } from "./liara.ts";
 import { Projects } from "./projects.ts";
 import { Vault } from "./vault.ts";
 import { digest, registerSecrets } from "./security.ts";
+import { checkSelectedPackage } from "./project-advice.ts";
 import type { Store } from "./store.ts";
 import type { Engine } from "./engine.ts";
 import type {
@@ -30,6 +31,7 @@ const route = z
 export const provisionSchema = z
   .object({
     projectId: z.string().uuid(),
+    packageId: z.string().max(40).optional(),
     appName: name,
     appPlan: z.string().max(120),
     networkId: z.string().max(100),
@@ -409,6 +411,7 @@ export class Provisioner {
     const projects = new Projects(this.db),
       project = projects.get(input.projectId);
     projects.verify(project.id, project.hash);
+    checkSelectedPackage(project, input);
     const names = new Set([
       input.appName,
       ...input.databases.map((d) => d.name),

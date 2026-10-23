@@ -12,6 +12,7 @@ import {
 import * as Dialog from "@radix-ui/react-dialog";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import LiaraAccount from "./LiaraAccount";
+import CursorAgentTest from "./CursorAgentTest";
 import {
   Activity,
   ArrowDownLeft,
@@ -142,7 +143,6 @@ function Logo({ small = false }: { small?: boolean }) {
         <strong>
           همراه<span>•</span>
         </strong>
-        {!small && <small>مدیر فنی هوشمند شما</small>}
       </div>
     </div>
   );
@@ -283,7 +283,6 @@ export default function App() {
   const [sidebar, setSidebar] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
   const [incident, setIncident] = useState<Incident | null>(null);
   const [service, setService] = useState<Service | null>(null);
@@ -564,30 +563,6 @@ export default function App() {
           </details>
         </nav>
         <div className="sidebar-bottom">
-          <div className="agent-mini">
-            <div className="agent-mini-head">
-              <span className="agent-symbol">
-                <AudioLines size={21} />
-              </span>
-              <span>
-                <strong>
-                  همراه {state.monitor.running ? "بیدار است" : "در استراحت است"}
-                </strong>
-                <small>
-                  {state.monitor.running
-                    ? "مراقب کسب‌وکار شما هستم"
-                    : "پایش خودکار متوقف است"}
-                </small>
-              </span>
-              <span
-                className={cn("status-dot", !state.monitor.running && "muted")}
-              />
-            </div>
-            <button onClick={() => setChatOpen(true)}>
-              گفتگو با همراه
-              <ArrowUpLeft size={17} />
-            </button>
-          </div>
           <button
             className={cn("nav-item", page === "settings" && "active")}
             onClick={() => navigate("settings")}
@@ -595,18 +570,6 @@ export default function App() {
             <Settings size={19} />
             تنظیمات و اتصال‌ها
           </button>
-          <button className="nav-item" onClick={() => setHelpOpen(true)}>
-            <LifeBuoy size={19} />
-            راهنمای همراه
-            <ArrowUpLeft className="push-end" size={15} />
-          </button>
-          <div className="sidebar-footer">
-            <span className="tiny-cloud">
-              <Cloud size={17} />
-            </span>
-            <span>ساخته‌شده برای لیارا</span>
-            <small>v1.0</small>
-          </div>
         </div>
       </aside>
       <div className="main-shell">
@@ -639,7 +602,7 @@ export default function App() {
               onClick={() => navigate("settings")}
             >
               <span className="status-dot" />
-              {state.mode === "demo" ? "محیط نمایشی" : "اتصال واقعی"}
+              {state.mode === "demo" ? "محیط نمایشی" : "حالت واقعی"}
               <ChevronDown size={12} />
             </button>
             <span className="topbar-divider" />
@@ -689,6 +652,36 @@ export default function App() {
               <span>{n}</span>
             </div>
           ))}
+          {state.mode === "live" &&
+            (!state.connections.cursor ||
+              !state.connections.cursorStatus?.ok) && (
+              <div className="notice-banner cursor-availability" role="status">
+                <TriangleAlert size={18} />
+                <div>
+                  <strong>
+                    {state.connections.cursorStatus?.code === "region_blocked"
+                      ? "Cursor در منطقهٔ فعلی در دسترس نیست"
+                      : "اجرای هوشمند Cursor تأیید نشده است"}
+                  </strong>
+                  <p>
+                    {state.connections.cursorStatus?.message ||
+                      (state.connections.cursor
+                        ? "ذخیرهٔ کلید به معنی اجرای موفق مدل نیست؛ تست واقعی ایجنت را در تنظیمات اجرا کنید."
+                        : "کلید Cursor تنظیم نشده است.")}
+                  </p>
+                  <p>
+                    پایش و تحلیل مبتنی بر قواعد ادامه دارد؛ پیشنهاد هوشمند
+                    زیرساخت و تحلیل مدل تا اتصال موفق محدود است.
+                  </p>
+                  <button
+                    className="text-button"
+                    onClick={() => navigate("settings")}
+                  >
+                    بررسی اتصال Cursor
+                  </button>
+                </div>
+              </div>
+            )}
           <div className="page-heading">
             <div>
               <div className="eyebrow">
@@ -697,28 +690,9 @@ export default function App() {
                   : state.settings.businessName + " / " + title}
               </div>
               <h1>
-                {page === "overview" ? "فروشگاه شما، زیر مراقبت" : title}
+                {page === "overview" ? "پیشخوان" : title}
                 <span className="heading-dot">.</span>
               </h1>
-              <p>
-                {page === "overview"
-                  ? "سفارش‌ها، اطلاعات و تغییرات مهم؛ ساده و قابل پیگیری."
-                  : page === "incidents"
-                    ? "از اولین نشانه تا تأیید رفع مشکل، همه‌چیز قابل پیگیری است."
-                    : page === "services"
-                      ? "تمام زیرساخت کسب‌وکارتان، ساده و یک‌جا."
-                      : page === "backups"
-                        ? "یک راه برگشت مطمئن برای اطلاعات مهم شما."
-                        : page === "growth"
-                          ? "پیشنهادهایی برای قدم بعدی کسب‌وکار شما."
-                          : page === "deployments"
-                            ? "از ایده تا انتشار؛ با یک مسیر روشن و قابل پیگیری."
-                            : page === "memory"
-                              ? "همراه یادش می‌ماند چه گفتیم، چه کردیم و به چه نتیجه‌ای رسیدیم."
-                              : page === "settings"
-                                ? "شما تعیین می‌کنید همراه به چه چیزهایی دسترسی داشته باشد."
-                                : "ساده بگویید چه می‌خواهید؛ همراه مسیرش را پیدا می‌کند."}
-              </p>
             </div>
             {page === "overview" ? (
               <Button
@@ -850,7 +824,7 @@ export default function App() {
                 <div className="panel">
                   <Empty
                     icon={ShieldCheck}
-                    title="خیالتان راحت، رخداد فعالی ندارید."
+                    title="رخداد فعالی وجود ندارد."
                     text="اگر مشکلی پیدا کنم، شواهد و راهکارش را همین‌جا ثبت می‌کنم."
                     action={
                       state.mode === "demo" ? (
@@ -913,18 +887,7 @@ export default function App() {
           )}
           {page === "deployments" && (
             <>
-              <div className="panel deploy-intro">
-                <span className="icon-tile large green">
-                  <Rocket size={30} />
-                </span>
-                <div>
-                  <h2>نسخهٔ تازه، با بررسی سفارش‌گیری</h2>
-                  <p>
-                    {state.mode === "demo"
-                      ? "انتشار نمونهٔ محلی را با نسخهٔ ایمنی و آزمایش سفارش‌گیری تجربه کنید. پروژهٔ آپلودشده فقط پیش‌نمایش بسته است."
-                      : "همان سورس تحلیل‌شده، پس از تأیید شما و آماده‌شدن نسخهٔ ایمنی منتشر می‌شود. در پایان، نسخهٔ فعال و سفارش‌گیری بررسی می‌شوند."}
-                  </p>
-                </div>
+              <div className="deployment-toolbar">
                 <Button
                   variant="primary"
                   icon={Plus}
@@ -934,15 +897,7 @@ export default function App() {
                   انتشار امن نسخهٔ تازه
                 </Button>
               </div>
-              <div className="care-deploy-path">
-                <span>۱. تأیید کد و هزینه</span>
-                <ArrowLeft size={15} />
-                <span>۲. نسخهٔ ایمنی</span>
-                <ArrowLeft size={15} />
-                <span>۳. انتشار</span>
-                <ArrowLeft size={15} />
-                <span>۴. دو آزمایش سفارش</span>
-              </div>
+
               {state.actions
                 .filter((a) => a.kind === "deploy_release")
                 .slice(0, 3)
@@ -1221,7 +1176,6 @@ export default function App() {
                 ? `آخرین بررسی ${time(state.monitor.lastCheck)}`
                 : "در انتظار اولین بررسی"}
             </div>
-            <span>شما بسازید، همراه مراقب است.</span>
           </footer>
         </main>
       </div>
@@ -1238,53 +1192,7 @@ export default function App() {
           </button>
         </div>
       )}
-      <Modal
-        open={helpOpen}
-        onOpenChange={setHelpOpen}
-        title="از اینجا شروع کنید"
-        description="همراه پیچیدگی فنی را به چند تصمیم روشن تبدیل می‌کند."
-      >
-        <div className="help-steps">
-          {[
-            {
-              title: "ببینید کسب‌وکارتان چه حال دارد",
-              text: "پیشخوان وضعیت سایت و مسیر سفارش را در یک نگاه نشان می‌دهد.",
-              icon: HeartPulse,
-            },
-            {
-              title: "مشکل را با شواهد بررسی کنید",
-              text: "همراه با پایش مستقل اختلال را پیدا می‌کند؛ لاگ‌ها و علت احتمالی در هر رخداد ذخیره می‌شوند.",
-              icon: Search,
-            },
-            {
-              title: "با آگاهی تأیید کنید",
-              text: "اثر و هزینهٔ هر تغییر مهم را پیش از تأیید می‌بینید. درخواست بعد از ۱۵ دقیقه منقضی می‌شود.",
-              icon: ShieldCheck,
-            },
-            {
-              title: "نتیجه را دنبال کنید",
-              text: "اجرای موفق دستور کافی نیست. سایت و مسیر اصلی کسب‌وکار باید دوباره بررسی شوند.",
-              icon: CheckCheck,
-            },
-          ].map(({ title, text, icon: Icon }) => (
-            <div key={title}>
-              <span className="icon-tile green">
-                <Icon size={21} />
-              </span>
-              <div>
-                <h3>{title}</h3>
-                <p>{text}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="info-line">
-          <BookOpen size={17} />
-          <a href="https://docs.liara.ir/" target="_blank" rel="noreferrer">
-            مستندات رسمی لیارا
-          </a>
-        </div>
-      </Modal>
+
       <Modal
         open={demoOpen}
         onOpenChange={setDemoOpen}
@@ -1555,6 +1463,29 @@ export default function App() {
                 {currentIncident.verification}
               </div>
             )}
+            {currentIncident.hypotheses?.length ? (
+              <div className="incident-hypotheses">
+                <h3>علت‌های احتمالی بر اساس شواهد</h3>
+                {currentIncident.hypotheses.map((h, i) => (
+                  <article key={i}>
+                    <strong>
+                      {fa(i + 1)}. {h.cause}
+                    </strong>
+                    <small>
+                      اطمینان{" "}
+                      {h.confidence === "high"
+                        ? "زیاد"
+                        : h.confidence === "medium"
+                          ? "متوسط"
+                          : "کم"}{" "}
+                      · تحلیل مبتنی بر قواعد
+                    </small>
+                    <p>{h.evidence.join("؛ ")}</p>
+                    <p>{h.next}</p>
+                  </article>
+                ))}
+              </div>
+            ) : null}
             <details className="evidence">
               <summary>
                 <FileText size={16} />
@@ -1790,11 +1721,15 @@ export default function App() {
                 <AudioLines size={23} />
               </span>
               <div>
-                <Dialog.Title>همراه شما هستم</Dialog.Title>
+                <Dialog.Title>گفتگو</Dialog.Title>
                 <Dialog.Description>
-                  {state.agentProvider === "cursor"
-                    ? "با حافظهٔ پایدار Cursor"
-                    : "پاسخ‌های نمایشی · حافظهٔ پایدار"}
+                  {state.mode === "demo"
+                    ? "پاسخ‌های نمایشی · حافظهٔ پایدار"
+                    : state.connections.cursorStatus?.code === "region_blocked"
+                      ? "Cursor در منطقهٔ فعلی در دسترس نیست"
+                      : state.connections.cursorStatus?.ok
+                        ? "با حافظهٔ پایدار Cursor"
+                        : "اجرای Cursor هنوز تأیید نشده است"}
                 </Dialog.Description>
               </div>
               <Dialog.Close className="icon-button" aria-label="بستن گفتگو">
@@ -2056,16 +1991,7 @@ function ActivityCard({
           زنده
         </span>
       </div>
-      <div className="activity-note">
-        <span className="agent-small">
-          <Sparkles size={15} />
-        </span>
-        <p>
-          {state.probes.at(-1)?.healthy
-            ? "آخرین بار سایت و مسیر سفارش را بررسی کردم؛ هر دو سالم‌اند."
-            : "وضعیت کسب‌وکارتان را زیر نظر دارم. نتیجهٔ بررسی‌ها همین‌جا ثبت می‌شود."}
-        </p>
-      </div>
+
       <div className="activity-list">
         {events.map((e, i) => (
           <div key={e.id} className="activity-item">
@@ -2356,7 +2282,11 @@ function ConnectionTestControl({
         disabled={!!busy || (!configured && !token.trim())}
         onClick={() => void test()}
       >
-        {busy === taskKey ? "در حال تست اتصال…" : `تست اتصال ${label}`}
+        {busy === taskKey
+          ? "در حال تست اتصال…"
+          : provider === "cursor"
+            ? "بررسی اعتبار کلید Cursor"
+            : `تست اتصال ${label}`}
       </Button>
       <p
         id={`${provider}-test-result`}
@@ -2787,31 +2717,11 @@ function SettingsPage({
           run={run}
           demo={state.mode === "demo"}
         />
-        <div className="env-guide">
-          <strong>
-            <Terminal size={16} />
-            راه‌اندازی اتصال واقعی
-          </strong>
-          <ol>
-            <li>کلید لیارا را در کادر بالا وارد و ذخیره کنید.</li>
-            <li>
-              «واقعی» را در بخش حالت اجرای همراه انتخاب کنید و «ذخیرهٔ حالت» را
-              بزنید؛ اتصال حساب پیش از تغییر حالت بررسی می‌شود.
-            </li>
-            <li>
-              از «راه‌اندازی آسان» برای تنظیم برنامه و زیرساخت کسب‌وکارتان
-              استفاده کنید.
-            </li>
-            <li>
-              کلید Cursor را در کادر بالا وارد و ذخیره کنید؛ نیازی به تغییر فایل
-              تنظیمات یا راه‌اندازی مجدد نیست.
-            </li>
-          </ol>
-          <p>
-            برای Cursor به Node.js نسخهٔ ۲۲٫۱۳ یا بالاتر و دسترسی شبکه به سرویس
-            Cursor نیاز دارید.
-          </p>
-        </div>
+        <CursorAgentTest
+          configured={state.connections.cursor}
+          status={state.connections.cursorStatus}
+        />
+
         <Button
           disabled={!!busy}
           icon={RefreshCw}
@@ -3041,24 +2951,6 @@ function Chat({ state }: { state: Snapshot }) {
         <div ref={end} />
       </div>
       <div className="chat-composer-area">
-        {state.messages.length < 5 && (
-          <div className="chat-suggestions">
-            {[
-              "فروشگاهم چه حالیه؟",
-              "چه چیزهایی یادت می‌مونه؟",
-              "کی به کش نیاز دارم؟",
-            ].map((s) => (
-              <button
-                key={s}
-                disabled={sending}
-                onClick={() => void submit(undefined, s)}
-              >
-                {s}
-                <ArrowUpLeft size={12} />
-              </button>
-            ))}
-          </div>
-        )}
         {error && (
           <p className="inline-error" role="alert">
             {error}
@@ -3067,7 +2959,7 @@ function Chat({ state }: { state: Snapshot }) {
         <form className="chat-composer" onSubmit={(e) => void submit(e)}>
           <textarea
             aria-label="پیام شما به همراه"
-            placeholder="هر چیزی که ذهنتان را مشغول کرده…"
+            placeholder="پیام خود را بنویسید…"
             value={text}
             onChange={(e) => setText(e.target.value)}
             maxLength={4000}

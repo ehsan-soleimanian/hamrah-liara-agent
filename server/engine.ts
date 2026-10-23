@@ -1,3 +1,14 @@
+import { Resources } from "./resources.ts";
+import {
+  defaultMonitorPolicy,
+  normalizeMetrics,
+  makeSample,
+  sustained,
+  breaches,
+  p95,
+  diagnose,
+} from "./monitoring.ts";
+import type { ResourceSample, MonitorPolicy } from "../src/monitoring-types.ts";
 import { Recovery } from "./recovery.ts";
 import { deployedSourceContext } from "./source-context.ts";
 import { Domains } from "./domains.ts";
@@ -75,6 +86,7 @@ const actionSchema = z
 export class Engine {
   liara = new Liara();
   recovery: Recovery;
+  resources: Resources;
   domains: Domains;
   brain: CursorBrain;
   services: Service[] = [];
@@ -90,6 +102,12 @@ export class Engine {
   constructor(public db: Store) {
     this.recovery = new Recovery(db, (endpoint, body) =>
       this.control(endpoint, body),
+    );
+    this.resources = new Resources(
+      db,
+      this.liara,
+      () => this.recovery.scope(),
+      () => this.appId(),
     );
     this.domains = new Domains(db, new Vault(config.dataDir));
     this.brain = new CursorBrain(db, {
@@ -173,9 +191,45 @@ export class Engine {
           content: [{ type: "text", text: redact(await this.logs()) }],
         }),
       },
+      get_resource_monitoring: {
+        description:
+          "Read scoped resource samples, thresholds, missing data and latency. Read only; demo is explicitly labeled.",
+        annotations: { readOnlyHint: true },
+        execute: async () => ({
+          content: [{ type: "text", text: JSON.stringify(this.monitoring()) }],
+        }),
+      },
+      request_resource_change: {
+        description:
+          "Create a pending human approval for a resource plan change. Never executes. Read get_resource_options first. Explain evidence and uncertainty.",
+        inputSchema: {
+          type: "object",
+          properties: { planId: { type: "string" } },
+          required: ["planId"],
+          additionalProperties: false,
+        },
+        execute: async (args) => {
+          const action = await this.resources.quote(String(args.planId));
+          this.emit();
+          return { content: [{ type: "text", text: JSON.stringify(action) }] };
+        },
+      },
+      get_resource_options: {
+        description:
+          "Read current resources, compatible plans and fresh costs. Read only.",
+        annotations: { readOnlyHint: true },
+        execute: async () => ({
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(await this.resources.options()),
+            },
+          ],
+        }),
+      },
       get_metrics: {
         description:
-          "Read actual Liara resource metrics. May be unavailable; never invent values.",
+          "Read raw Liara metrics. Units are unspecified by the public schema; never infer units or percentages. Use get_resource_monitoring for explicitly normalized samples.",
         annotations: { readOnlyHint: true },
         execute: async () => ({
           content: [
@@ -235,6 +289,16 @@ export class Engine {
       },
     });
     if (!db.value("initialized", false)) this.seed();
+    for (const incident of db.list<Incident>("incidents"))
+      if (
+        incident.category === "performance" &&
+        ["DETECTED", "INVESTIGATING", "VERIFYING"].includes(incident.status)
+      )
+        this.move(
+          incident.id,
+          "ESCALATED",
+          "بررسی با توقف سرور کامل نشد؛ شواهد حفظ شده و نیاز به بررسی تازه است.",
+        );
     // A crash after dispatch leaves the outcome uncertain: never blindly replay it.
     for (const action of db.list<Action>("actions"))
       if (action.status === "executing") {
@@ -478,6 +542,7 @@ export class Engine {
     let healthOk = false,
       businessOk = false;
     let error: string | undefined;
+    let healthLatency: number | undefined;
     try {
       if (!health) throw new Error("APP_HEALTH_URL تنظیم نشده است.");
       const r = await fetch(health, {
@@ -492,6 +557,7 @@ export class Engine {
         (healthData.ok === false || healthData.healthy === false)
       )
         healthOk = false;
+      healthLatency = Math.round(performance.now() - start);
       if (!business)
         throw new Error(
           "بررسی مسیر اصلی کسب‌وکار تنظیم نشده؛ موفقیت کامل قابل تأیید نیست.",
@@ -516,6 +582,7 @@ export class Engine {
       healthOk,
       businessOk,
       latency: Math.round(performance.now() - start),
+      healthLatency,
       statusCode,
       error,
     };
@@ -543,10 +610,15 @@ export class Engine {
       this.failures = probe.healthy ? 0 : this.failures + 1;
       if (probe.healthy) this.db.set("outageLatched", false);
       await this.loadServices().catch(() => {});
+      await this.sampleResources(probe);
       this.emit();
       const active = this.db
         .list<Incident>("incidents")
-        .find((i) => !["RESOLVED", "ESCALATED", "REJECTED"].includes(i.status));
+        .find(
+          (i) =>
+            i.category !== "performance" &&
+            !["RESOLVED", "ESCALATED", "REJECTED"].includes(i.status),
+        );
       if (
         this.failures >= config.threshold &&
         !active &&
@@ -599,6 +671,248 @@ export class Engine {
       this.probing = false;
     }
   }
+
+  monitorPolicy(): MonitorPolicy {
+    return { ...defaultMonitorPolicy, ...this.settings().resourcePolicy };
+  }
+  diagnosticSample() {
+    const monitor = this.monitoring();
+    return monitor.stale ? undefined : monitor.samples.at(-1);
+  }
+  monitoring() {
+    const policy = this.monitorPolicy();
+    const samples = this.db
+      .list<ResourceSample>("resourceSamples")
+      .filter(
+        (s) =>
+          s.scope === this.recovery.scope() && s.policyHash === digest(policy),
+      )
+      .slice(0, 120)
+      .reverse();
+    return {
+      policy,
+      samples,
+      p95Ms: p95(samples),
+      stale:
+        !this.settings().monitoring ||
+        !samples.length ||
+        Date.now() - Date.parse(samples.at(-1)!.at) >
+          Math.max(20000, config.intervalMs * 3),
+    };
+  }
+  async sampleResources(probe: Probe) {
+    const scope = this.recovery.scope(),
+      policy = this.monitorPolicy();
+    const sample = makeSample(
+      scope,
+      config.mode,
+      probe.healthy,
+      probe.healthLatency ?? probe.latency,
+    );
+    sample.policyHash = digest(policy);
+    if (config.mode === "demo")
+      Object.assign(sample, { cpuPercent: 18, memoryPercent: 42 });
+    else {
+      const [metrics, options] = await Promise.allSettled([
+        this.liara.metrics(this.appId()),
+        policy.cpuUnit === "cores" ||
+        policy.cpuUnit === "nanocores" ||
+        policy.memoryUnit === "bytes"
+          ? this.resources.options()
+          : Promise.resolve(undefined),
+      ]);
+      if (metrics.status === "fulfilled")
+        Object.assign(
+          sample,
+          normalizeMetrics(
+            metrics.value,
+            options.status === "fulfilled" ? options.value?.current || {} : {},
+            policy,
+            Date.now(),
+            Math.max(180000, config.intervalMs * 3),
+          ),
+        );
+      else sample.metricsError = redact((metrics.reason as Error).message);
+    }
+    if (
+      probe.scope !== scope ||
+      scope !== this.recovery.scope() ||
+      digest(policy) !== digest(this.monitorPolicy())
+    )
+      return;
+    this.db.put("resourceSamples", sample);
+    this.db.db
+      .prepare(
+        "DELETE FROM records WHERE collection='resourceSamples' AND rowid NOT IN (SELECT rowid FROM records WHERE collection='resourceSamples' ORDER BY rowid DESC LIMIT 10080)",
+      )
+      .run();
+    const service = this.services.find((s) => s.id === this.appId());
+    if (service) {
+      service.cpu = sample.cpuPercent;
+      service.memory = sample.memoryPercent;
+    }
+    const samples = this.monitoring().samples;
+    const keys = sustained(samples, policy, config.intervalMs);
+    const incident = this.db
+      .list<Incident>("incidents")
+      .find(
+        (i) =>
+          i.category === "performance" &&
+          i.scope === scope &&
+          i.status !== "RESOLVED" &&
+          i.status !== "REJECTED",
+      );
+    if (incident) {
+      const known = (s: ResourceSample, key: string) =>
+        key === "CPU"
+          ? s.cpuPercent !== undefined
+          : key === "RAM"
+            ? s.memoryPercent !== undefined
+            : s.latencyMs !== undefined;
+      if (
+        samples.length >= 2 &&
+        samples
+          .slice(-2)
+          .every(
+            (s) =>
+              s.healthy &&
+              (incident.performanceKeys || []).every(
+                (key) => known(s, key) && !breaches(s, policy).includes(key),
+              ),
+          ) &&
+        Date.parse(samples.at(-1)!.at) - Date.parse(samples.at(-2)!.at) <=
+          config.intervalMs * 3
+      ) {
+        const current = this.db.get<Incident>("incidents", incident.id)!;
+        if (
+          ["ESCALATED", "AWAITING_APPROVAL", "REJECTED"].includes(
+            current.status,
+          )
+        ) {
+          this.move(
+            incident.id,
+            "VERIFYING",
+            "دو نمونهٔ متوالی زیر آستانه ثبت شد.",
+          );
+          this.move(
+            incident.id,
+            "RESOLVED",
+            "سلامت سایت و بازگشت شاخص‌های رخداد به زیر آستانه تأیید شد.",
+          );
+          this.db.audit(
+            "performance_recovered",
+            "هشدار منابع یا کندی برطرف شد",
+            incident.id,
+          );
+        }
+      }
+      return;
+    }
+    if (!keys.length) return;
+    const at = now(),
+      id = randomUUID();
+    const created: Incident = {
+      id,
+      scope,
+      category: "performance",
+      performanceKeys: keys,
+      appId: this.appId(),
+      title: "هشدار " + keys.join("، "),
+      summary:
+        keys.join("، ") +
+        " در " +
+        policy.consecutive +
+        " بررسی پیاپی از آستانه عبور کرده است.",
+      status: "DETECTED",
+      createdAt: at,
+      updatedAt: at,
+      source: config.mode,
+      evidence: [
+        {
+          label: "نمونهٔ پایش و آستانه‌ها",
+          value: JSON.stringify({ sample, policy }),
+          source:
+            config.mode === "demo"
+              ? "demo metrics"
+              : "Liara metrics + health probe",
+          at,
+        },
+      ],
+      timeline: [
+        { status: "DETECTED", at, note: "پایش مستقل منابع و زمان پاسخ" },
+      ],
+    };
+    this.db.put("incidents", created);
+    this.db.audit("performance_alert", created.title, id);
+    void this.investigatePerformance(created);
+  }
+  async investigatePerformance(incident: Incident) {
+    if (incident.scope !== this.recovery.scope())
+      throw new Error("حساب رخداد با اتصال فعلی یکسان نیست.");
+    if (!["DETECTED", "ESCALATED"].includes(incident.status)) return;
+    this.move(
+      incident.id,
+      "INVESTIGATING",
+      "جمع‌آوری لاگ و مقایسهٔ منابع و زمان پاسخ",
+    );
+    const scope = this.recovery.scope();
+    let logText = "";
+    try {
+      logText = redact(await this.logs()).slice(-12000);
+    } catch {
+      logText = "دریافت لاگ ممکن نشد";
+    }
+    if (scope !== this.recovery.scope()) return;
+    const hypotheses = diagnose(
+      this.diagnosticSample(),
+      logText,
+      this.monitorPolicy(),
+    );
+    const current = this.db.get<Incident>("incidents", incident.id)!;
+    this.db.put("incidents", {
+      ...current,
+      hypotheses,
+      diagnosis: hypotheses
+        .map((h, i) => i + 1 + ". " + h.cause + "؛ " + h.next)
+        .join("\n"),
+      evidence: [
+        ...current.evidence,
+        {
+          label: "لاگ بررسی",
+          value: logText,
+          source: "application logs",
+          at: now(),
+        },
+      ],
+    });
+    // Local evidence stays usable if the model is blocked; it is labeled as rule-based.
+    if (config.mode === "live" && config.cursorKey) {
+      try {
+        const explanation = await this.brain.send(
+          "Read-only performance investigation. Rank likely causes and uncertainties using logs, scoped resource samples and source context. Do not propose or execute mutations. Evidence: " +
+            JSON.stringify({
+              hypotheses,
+              sample: this.diagnosticSample(),
+            }),
+          { readOnly: true },
+        );
+        if (scope === this.recovery.scope())
+          this.db.put("incidents", {
+            ...this.db.get<Incident>("incidents", incident.id)!,
+            diagnosis: explanation,
+          });
+      } catch {
+        /* cursorStatus preserves the precise failure for the dashboard. */
+      }
+    }
+    if (scope === this.recovery.scope())
+      this.move(
+        incident.id,
+        "ESCALATED",
+        "علت‌های احتمالی و پیشنهاد بررسی ثبت شد؛ تغییر منابع فقط با تأیید جداگانه انجام می‌شود.",
+      );
+    this.emit();
+  }
   expireApprovals() {
     let changed = false;
     for (const action of this.db.list<Action>("actions"))
@@ -626,6 +940,13 @@ export class Engine {
     if (changed) this.emit();
   }
   async recheckIncident(id: string) {
+    const performanceIncident = this.db.get<Incident>("incidents", id);
+    if (performanceIncident?.category === "performance") {
+      if (this.executing || this.probing)
+        throw new Error("بررسی دیگری در حال اجراست.");
+      await this.tick(true);
+      return;
+    }
     if (this.executing)
       throw new Error("یک عملیات یا بررسی نتیجه در حال اجراست.");
     const incident = this.db.get<Incident>("incidents", id);
@@ -688,6 +1009,9 @@ export class Engine {
     }
   }
   async investigate(id: string) {
+    const performanceIncident = this.db.get<Incident>("incidents", id);
+    if (performanceIncident?.category === "performance")
+      return this.investigatePerformance(performanceIncident);
     try {
       this.move(id, "INVESTIGATING", "در حال جمع‌آوری لاگ و بررسی مسیر سفارش");
       const logs = await this.logs().catch((e) => ({
@@ -707,6 +1031,15 @@ export class Engine {
             at: now(),
           },
         ],
+      });
+      const current = this.db.get<Incident>("incidents", id)!;
+      this.db.put("incidents", {
+        ...current,
+        hypotheses: diagnose(
+          this.diagnosticSample(),
+          redact(logs),
+          this.monitorPolicy(),
+        ),
       });
       this.emit();
       if (config.mode === "demo") {
@@ -888,6 +1221,12 @@ export class Engine {
       ActionKind,
       { title: string; description: string; impact: string; cost: string }
     > = {
+      resize_app: {
+        title: "تغییر منابع",
+        description: "از مسیر پیشنهاد منابع استفاده کنید.",
+        impact: "قطع موقت و تغییر هزینه",
+        cost: "نیازمند قیمت تازه",
+      },
       restart_app: {
         title: "راه‌اندازی مجدد فروشگاه",
         description:
@@ -1157,6 +1496,11 @@ export class Engine {
             "تنظیمات فروشگاه از زمان پیشنهاد تغییر کرده است؛ پیش از انتشار تأیید تازه بگیرید.",
           );
         step("تنظیمات فروشگاه با پیشنهاد تأییدشده یکسان است");
+      }
+      if (action.kind === "resize_app") {
+        step("در حال بررسی دوبارهٔ تعرفه، حساب و پلن فعلی", "running");
+        await this.resources.execute(action);
+        step("پلن جدید و حفظ بستهٔ امکانات از وضعیت سرویس تأیید شد");
       }
       if (action.kind === "restart_app") {
         if (config.mode === "demo") await this.control("restart", {});
@@ -1650,6 +1994,7 @@ export class Engine {
   snapshot(): Snapshot {
     return {
       care: this.care(),
+      monitoring: this.monitoring(),
       mode: config.mode,
       managedAppId: this.appId(),
       agentProvider:
@@ -1659,7 +2004,12 @@ export class Engine {
             ? "cursor"
             : "unconfigured",
       services: this.services,
-      incidents: this.db.list("incidents"),
+      incidents: this.db
+        .list<Incident>("incidents")
+        .filter(
+          (i) =>
+            i.category !== "performance" || i.scope === this.recovery.scope(),
+        ),
       actions: this.db.list("actions"),
       probes: this.db
         .list<Probe>("probes")
@@ -1684,6 +2034,7 @@ export class Engine {
           : this.db.value("releasesCache", []),
       settings: this.settings(),
       connections: {
+        cursorStatus: this.db.value("cursorStatus", undefined),
         teamId: config.teamId,
         liara: !!config.liaraToken,
         cursor: !!config.cursorKey,

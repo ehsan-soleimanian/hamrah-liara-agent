@@ -13,6 +13,7 @@ import {
   RefreshCw,
   Rocket,
   ShieldCheck,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 import { api, fa } from "./lib";
@@ -88,9 +89,11 @@ function envHelp(name: string) {
 export default function ProvisionFlow({
   state,
   report,
+  packageId,
 }: {
   state: Snapshot;
   report: ProjectReport;
+  packageId?: string;
 }) {
   const [catalog, setCatalog] = useState<CloudCatalog | null>(null),
     [loading, setLoading] = useState(true),
@@ -128,6 +131,22 @@ export default function ProvisionFlow({
   const [selectedJob, setSelectedJob] = useState<string | null>(null);
   const [logs, setLogs] = useState("");
   const reviewHeading = useRef<HTMLHeadingElement>(null);
+  const proposedPackage =
+    report.advice?.status === "ready"
+      ? report.advice.packages?.find(
+          (p) => p.id === (packageId || report.advice?.recommendedId),
+        )
+      : undefined;
+  const followsPackage =
+    !!proposedPackage &&
+    appPlan === proposedPackage.app.id &&
+    databases.length === proposedPackage.databases.length &&
+    proposedPackage.databases.every((d) =>
+      databases.some(
+        (x) =>
+          x.type === d.type && x.plan === d.plan.id && x.version === d.version,
+      ),
+    );
   async function loadCatalog() {
     setError("");
     setLoading(true);
@@ -149,27 +168,53 @@ export default function ProvisionFlow({
   }, [state.mode, state.connections.liara, state.connections.teamId]);
   useEffect(() => {
     if (!catalog) return;
-    setAppPlan((current) =>
-      catalog.appPlans.some((p) => p.id === current)
-        ? current
-        : (
-            catalog.appPlans.find(
-              (p) => p.ram >= (/Next|Nuxt/.test(report.stack) ? 1 : 0.5),
-            ) || catalog.appPlans[0]
-          )?.id || "",
-    );
-    const list = report.services
-      .map((s) => suggestedType(s.name))
-      .filter((t): t is DatabaseType => !!t)
-      .map((type, i) => ({
-        type,
-        name: `${appName.slice(0, 28)}-${type === "redis" ? "cache" : `db${i + 1}`}`,
-        plan:
-          catalog.databasePlans.find((p) => p.supports.includes(type))?.id ||
-          "",
-        version: catalog.versions[type]?.[0] || "",
-        bindings: {},
-      }));
+    if (proposedPackage) {
+      const supported =
+        catalog.appPlans.some((p) => p.id === proposedPackage.app.id) &&
+        proposedPackage.databases.every(
+          (d) =>
+            catalog.databasePlans.some(
+              (p) => p.id === d.plan.id && p.supports.includes(d.type),
+            ) && catalog.versions[d.type]?.includes(d.version),
+        );
+      if (!supported) {
+        setAppPlan("");
+        setError(
+          "یکی از پلن‌های پیشنهاد Cursor دیگر در لیارا موجود نیست؛ به تحلیل برگردید و پیشنهاد تازه بگیرید.",
+        );
+        return;
+      }
+      setAppPlan(proposedPackage.app.id);
+    } else
+      setAppPlan((current) =>
+        catalog.appPlans.some((p) => p.id === current)
+          ? current
+          : (
+              catalog.appPlans.find(
+                (p) => p.ram >= (/Next|Nuxt/.test(report.stack) ? 1 : 0.5),
+              ) || catalog.appPlans[0]
+            )?.id || "",
+      );
+    const list = proposedPackage
+      ? proposedPackage.databases.map((d, i) => ({
+          type: d.type,
+          name: `${appName.slice(0, 28)}-${d.type === "redis" ? "cache" : `db${i + 1}`}`,
+          plan: d.plan.id,
+          version: d.version,
+          bindings: {},
+        }))
+      : report.services
+          .map((s) => suggestedType(s.name))
+          .filter((t): t is DatabaseType => !!t)
+          .map((type, i) => ({
+            type,
+            name: `${appName.slice(0, 28)}-${type === "redis" ? "cache" : `db${i + 1}`}`,
+            plan:
+              catalog.databasePlans.find((p) => p.supports.includes(type))
+                ?.id || "",
+            version: catalog.versions[type]?.[0] || "",
+            bindings: {},
+          }));
     setDatabases(list);
     setBindings(
       Object.fromEntries(
@@ -177,7 +222,7 @@ export default function ProvisionFlow({
       ),
     );
     setNetworkId("");
-  }, [catalog]);
+  }, [catalog, report.id, packageId]);
   const jobs = (state.provisionJobs || []).filter(
     (j) => j.projectId === report.id,
   );
@@ -249,6 +294,7 @@ export default function ProvisionFlow({
         }
       const result = await api<ProvisionJob>("/provision/quote", {
         projectId: report.id,
+        ...(followsPackage ? { packageId: proposedPackage!.id } : {}),
         appName,
         appPlan,
         networkId,
@@ -400,11 +446,25 @@ export default function ProvisionFlow({
       )}
       {!active && !quote && (
         <>
+          {proposedPackage && !loading && appPlan && (
+            <div className="advice-handoff">
+              <Sparkles size={20} />
+              <div>
+                <strong>
+                  {followsPackage
+                    ? "بستهٔ انتخاب‌شده از پیشنهاد Cursor"
+                    : "تنظیمات دستی شما"}
+                </strong>
+                <p>
+                  {followsPackage
+                    ? `${proposedPackage.title} · منابع همان بسته در فرم تنظیم شده‌اند. فقط نام سایت و اطلاعات ضروری را کامل کنید.`
+                    : "منابع را تغییر داده‌اید؛ هزینهٔ تازه پیش از اجرا برای تأیید نمایش داده می‌شود."}
+                </p>
+              </div>
+            </div>
+          )}
           <h3>فقط چند انتخاب ساده مانده.</h3>
-          <p className="provision-intro">
-            نام سایت و نیازهای پیشنهادی را ببینید. همراه دیتابیس‌ها را می‌سازد،
-            رمز اتصال را دریافت می‌کند و تنظیمات برنامه را خودش انجام می‌دهد.
-          </p>
+
           {loading ? (
             <p role="status">
               <LoaderCircle className="spin" size={18} /> در حال دریافت پلن‌ها و
@@ -450,7 +510,11 @@ export default function ProvisionFlow({
                       </option>
                       {catalog.appPlans.map((p, i) => (
                         <option key={p.id} value={p.id}>
-                          {i === 0 ? "شروع اقتصادی · " : ""}
+                          {p.id === proposedPackage?.app.id
+                            ? "پیشنهاد Cursor · "
+                            : state.mode === "demo" && i === 0
+                              ? "نمونهٔ نمایشی · "
+                              : ""}
                           {p.label} · حدود {money(p.monthly)} تومان در ماه
                         </option>
                       ))}

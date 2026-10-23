@@ -1,3 +1,4 @@
+import MonitoringPanel from "./MonitoringPanel";
 import { useEffect, useState } from "react";
 import {
   ArrowLeft,
@@ -216,7 +217,7 @@ export default function CareDashboard(p: Props) {
         <section className="care-next">
           <HeartPulse size={23} />
           <div>
-            <h2>همراه را دوباره بیدار کنید</h2>
+            <h2>پایش غیرفعال است</h2>
             <p>
               پایش به‌صورت مستقل از گفتگو انجام می‌شود؛ تغییرات همچنان تأیید
               می‌خواهند.
@@ -234,77 +235,9 @@ export default function CareDashboard(p: Props) {
             فعال‌کردن مراقبت
           </button>
         </section>
-      ) : (
-        <div className="care-reassurance">
-          <ShieldCheck size={17} />
-          <span>
-            همراه مشکل را پیدا می‌کند؛ هر تغییر با تأیید شما انجام می‌شود.
-          </span>
-        </div>
-      )}
+      ) : null}
 
-      <section className="care-summary" aria-label="مراقبت از فروشگاه">
-        <div className="care-summary-heading">
-          <h2>سه کار مهم، زیر نظر همراه</h2>
-          <span>شما به گل‌ها برسید.</span>
-        </div>
-        <div className="care-columns">
-          <article>
-            <ShoppingBag size={23} />
-            <h3>سفارش‌های مشتری</h3>
-            <strong>
-              {healthy ? "مسیر سفارش آزمایش شد" : "نیاز به بررسی تازه"}
-            </strong>
-            <p>
-              تنها بازشدن صفحه کافی نیست. ثبت و خواندن سفارش هم باید کار کند.
-            </p>
-            <button
-              className="care-link"
-              onClick={() => p.navigate("incidents")}
-            >
-              سلامت و پیگیری‌ها
-              <ArrowLeft size={15} />
-            </button>
-          </article>
-          <article>
-            <HardDrive size={23} />
-            <h3>اطلاعات فروشگاه</h3>
-            <strong>
-              {care?.lastBackup
-                ? `آخرین پشتیبان: ${time(care.lastBackup.at)}`
-                : "هنوز پشتیبانی ندارید"}
-            </strong>
-            <p>
-              {care?.policy.enabled
-                ? "پشتیبان‌گیری هر ۶ ساعت فعال است."
-                : "یک نسخهٔ پشتیبان، راه برگشت سفارش‌های شماست."}
-              {care?.backupError
-                ? " آخرین پشتیبان‌گیری نیاز به پیگیری دارد."
-                : ""}
-            </p>
-            <button className="care-link" onClick={() => p.navigate("backups")}>
-              پشتیبان و بازیابی
-              <ArrowLeft size={15} />
-            </button>
-          </article>
-          <article>
-            <Rocket size={23} />
-            <h3>نسخهٔ تازهٔ فروشگاه</h3>
-            <strong>اول نسخهٔ ایمنی، بعد انتشار</strong>
-            <p>
-              همان کد تأییدشده منتشر می‌شود؛ در پایان، سفارش‌گیری دوباره آزمایش
-              می‌شود.
-            </p>
-            <button
-              className="care-link"
-              onClick={() => p.navigate("deployments")}
-            >
-              انتشار امن
-              <ArrowLeft size={15} />
-            </button>
-          </article>
-        </div>
-      </section>
+      <MonitoringPanel state={state} approve={p.approve} online={online} />
       <section className="care-recent">
         <div className="care-summary-heading">
           <h2>آخرین پیگیری‌ها</h2>
@@ -348,11 +281,7 @@ export default function CareDashboard(p: Props) {
         ) : (
           <div className="care-empty">
             <Flower2 size={24} />
-            <p>
-              اولین پیگیری از همین‌جا شروع می‌شود.
-              <br />
-              <small>هر بررسی، پیشنهاد و نتیجه در حافظهٔ همراه می‌ماند.</small>
-            </p>
+            <p>فعالیتی ثبت نشده است.</p>
           </div>
         )}
       </section>
@@ -372,11 +301,7 @@ export function ProtectionPanel({
       <div className="care-row">
         <div>
           <h2>پشتیبان خودکار از سفارش‌ها</h2>
-          <p>
-            {policy?.enabled
-              ? "فعال · هر ۶ ساعت"
-              : "با یک تأیید، پشتیبان‌گیری منظم را به همراه بسپارید."}
-          </p>
+          <p>{policy?.enabled ? "فعال · هر ۶ ساعت" : "غیرفعال"}</p>
         </div>
         <ShieldCheck size={25} />
       </div>

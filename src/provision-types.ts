@@ -31,6 +31,7 @@ export interface DatabaseSelection {
   bindings: Record<string, string>;
 }
 export interface ProvisionInput {
+  packageId?: string;
   projectId: string;
   appName: string;
   appPlan: string;

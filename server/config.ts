@@ -9,6 +9,7 @@ export const config = {
   dataDir: path.resolve(process.env.DATA_DIR || "./data"),
   liaraToken: process.env.LIARA_API_TOKEN || "",
   cursorKey: process.env.CURSOR_API_KEY || "",
+  cursorProxyUrl: process.env.CURSOR_PROXY_URL || "",
   model: process.env.CURSOR_MODEL || "composer-2.5",
   password: process.env.DASHBOARD_PASSWORD || "",
   appId: process.env.LIARA_APP_ID || "",

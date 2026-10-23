@@ -10,7 +10,7 @@ Base URL ثابت: `https://api.liara.ir`؛ احراز هویت: `Authorization:
 | -------------- | -------------------------------------------------- | ---------------------------------------------------- |
 | فهرست برنامه   | `GET /v1/projects`                                 | پیاده‌سازی؛ شناسهٔ قابل استفاده `project_id`         |
 | لاگ برنامه     | `GET /v2/projects/{name}/logs?start=...&direction=forward&last_lines=true` | start به ثانیهٔ Unix؛ آزموده‌شده در اتصال واقعی |
-| منابع          | `GET /v1/projects/{name}/metrics/summary`          | ابزار خواندنی Cursor                                 |
+| منابع          | `GET /v1/projects/{name}/metrics/summary`          | پایش دوره‌ای و ابزار خواندنی؛ واحد با تنظیم صریح اپراتور |
 | ری‌استارت      | `POST /v1/projects/{name}/actions/restart`         | پس از تأیید و allowlist                              |
 | دریافت نسخه‌ها | `GET /v1/projects/{name}/releases?page=1&count=20` | نمایش و بررسی currentRelease                         |
 | بارگذاری سورس  | `POST /v2/projects/{name}/sources`                 | multipart با فیلد file حاوی tar.gz                   |
@@ -26,7 +26,7 @@ Base URL ثابت: `https://api.liara.ir`؛ احراز هویت: `Authorization:
 
 به پاسخ موفق یا JSON معتبر اعتماد کور نمی‌شود: فهرست برنامه باید projects داشته باشد؛ ارسال سورس باید sourceID و انتشار باید releaseID برگرداند. پاسخ‌های ۴۰۱، ۴۰۳، ۴۰۴، ۴۲۹ یا ۵۰۰ به پیام خطا تبدیل می‌شوند و با دادهٔ demo جایگزین نمی‌شوند. خطاهای کامل بعد از حذف مقادیر حساس محدود می‌شوند. timeout هر درخواست لیارا ۲۰ ثانیه است؛ retry کور روی mutation نداریم.
 
-ساخت برنامه و دیتابیس و `update-envs` اکنون فقط در جریان راه‌اندازی تأییدشده فعال‌اند. تغییر پلن منابع موجود، پرداخت بانکی، restore ابری و ویرایش کد همچنان ابزار اجرایی ندارند. خطای mutation به‌صورت خودکار retry نمی‌شود؛ نتیجهٔ نامشخص در گزارش باقی می‌ماند.
+ساخت برنامه و دیتابیس و `update-envs` اکنون فقط در جریان راه‌اندازی تأییدشده فعال‌اند. تغییر پلن برنامهٔ موجود از مسیر پیشنهاد و تأیید جداگانه اجرا می‌شود؛ پرداخت بانکی، restore ابری عمومی و ویرایش آزاد کد همچنان ابزار اجرایی ندارند. خطای mutation به‌صورت خودکار retry نمی‌شود؛ نتیجهٔ نامشخص در گزارش باقی می‌ماند.
 
 ## ساخت و اتصال زیرساخت
 
@@ -85,3 +85,7 @@ Base URL ثابت: `https://api.liara.ir`؛ احراز هویت: `Authorization:
 ## Domain workflow
 
 See [DOMAINS.md](DOMAINS.md) for the two-stage approval protocol, Liara DNS adapter (primary), optional Cloudflare adapter, pinned-public-IP TLS verification and persistent worker. Uses documented Liara domain create/check/provision-ssl endpoints plus public-console details GET /v1/domains/{name}. CNameRecord is a validation status; target is the DNS destination. Both TXT ownership and ACME CNAME are required. No generic force-HTTPS endpoint is assumed.
+
+## تغییر منابع و پایش
+
+قرارداد `POST /v1/projects/{name}/resize` با بدنهٔ `{ planID }` در OpenAPI رسمی، ۲۳ اکتبر ۲۰۲۶ بررسی شد. مسیر اجرا قیمت و منابع را پیش و پس از تأیید می‌سنجد، بستهٔ امکانات را حفظ و نتیجهٔ پلن و سلامت را بررسی می‌کند. چون واحد `cpuUsage` و `memoryUsage` در schema خلاصه مشخص نیست، واحد صریح تنظیم می‌شود و دادهٔ نامعتبر یا قدیمی هشدار درصدی ایجاد نمی‌کند. [قرارداد کامل و تست‌ها](MONITORING.md).

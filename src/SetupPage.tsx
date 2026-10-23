@@ -16,6 +16,7 @@ import type { Snapshot, Action } from "./types";
 import type { ProjectReport } from "./project-types";
 import { api, cn, fa } from "./lib";
 import ProvisionFlow from "./ProvisionFlow";
+import ProjectAdvicePanel from "./ProjectAdvice";
 
 export default function SetupPage({
   state,
@@ -34,9 +35,73 @@ export default function SetupPage({
   const [report, setReport] = useState<ProjectReport | null>(null);
   const [savedProject, setSavedProject] = useState<ProjectReport | null>(null);
   const [busy, setBusy] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+  const [selectedPackage, setSelectedPackage] = useState("");
   const [error, setError] = useState("");
   const heading = useRef<HTMLHeadingElement>(null);
   const canUpdate = !!state.managedAppId && state.connections.writable;
+  const adviceReady = report?.advice?.status === "ready";
+  const canContinue = state.mode === "demo" || adviceReady;
+  const packageId = selectedPackage || report?.advice?.recommendedId || "";
+  async function reviewProject(project: ProjectReport) {
+    setReviewing(true);
+    setError("");
+    setReport({
+      ...project,
+      advice: {
+        ...project.advice,
+        provider: "cursor",
+        projectHash: project.hash,
+        status: "analyzing",
+        stage: "connecting",
+        at: new Date().toISOString(),
+      },
+    });
+    try {
+      const result = await api<ProjectReport>(
+        `/projects/${project.id}/advice`,
+        {},
+      );
+      setReport(result);
+      setSavedProject(result);
+      setSelectedPackage("");
+    } catch (e) {
+      setError((e as Error).message);
+      setReport(
+        (current) =>
+          current && {
+            ...current,
+            advice: {
+              provider: "cursor",
+              projectHash: current.hash,
+              status: "failed",
+              at: new Date().toISOString(),
+              error: { code: "request_failed", message: (e as Error).message },
+            },
+          },
+      );
+    } finally {
+      setReviewing(false);
+    }
+  }
+  useEffect(() => {
+    if (step !== 1 || report?.advice?.status !== "analyzing") return;
+    const id = report.id;
+    let alive = true;
+    const poll = setInterval(() => {
+      fetch(`/api/projects/${id}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((p) => {
+          if (alive && p)
+            setReport((current) => (current?.id === id ? p : current));
+        })
+        .catch(() => {});
+    }, 1800);
+    return () => {
+      alive = false;
+      clearInterval(poll);
+    };
+  }, [step, report?.id, report?.advice?.status]);
   async function updateCurrent() {
     if (!report) return;
     setBusy(true);
@@ -108,7 +173,11 @@ export default function SetupPage({
       }
       setReport(result);
       setSavedProject(result);
+      setSelectedPackage("");
+      setBusy(false);
       go(1);
+      if (state.mode === "live" || state.connections.cursor)
+        await reviewProject(result);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -136,14 +205,10 @@ export default function SetupPage({
         <div className="wizard-content">
           {step === 0 && (
             <>
-              <span className="eyebrow">از کد شما شروع می‌کنیم</span>
               <h2 ref={heading} tabIndex={-1}>
-                پروژه‌تان را به همراه بسپارید.
+                انتخاب پروژه
               </h2>
-              <p>
-                لینک گیت‌هاب بدهید یا فایل پروژه را انتخاب کنید. همراه کد را
-                بررسی می‌کند و می‌گوید برای آنلاین‌شدن به چه چیزهایی نیاز دارید.
-              </p>
+
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -325,24 +390,30 @@ export default function SetupPage({
               <div className="intake-result-heading">
                 <div>
                   <span className="eyebrow">
-                    پیشنهاد بر اساس فایل‌های واقعی
+                    دریافت سورس از فایل‌های واقعی تأیید شد
                   </span>
                   <h2 ref={heading} tabIndex={-1}>
-                    پروژه‌تان را شناختیم.
+                    {adviceReady
+                      ? "پیشنهاد کرسر آماده است."
+                      : reviewing || report.advice?.status === "analyzing"
+                        ? "از کد شما تا پیشنهاد مناسب."
+                        : "سورس پروژه دریافت شد."}
                   </h2>
                 </div>
                 <button
                   type="button"
                   className="button secondary"
-                  disabled={busy}
+                  disabled={
+                    busy || reviewing || report.advice?.status === "analyzing"
+                  }
                   onClick={() => go(0)}
                 >
                   واردکردن پروژهٔ جدید
                 </button>
               </div>
               <p>
-                برای «{report.name}» این مسیر را پیشنهاد می‌کنم. میزان دقیق
-                منابع پس از اجرا مشخص می‌شود.
+                نسخهٔ «{report.name}» دریافت و فایل‌ها بررسی شده‌اند. پیشنهاد
+                پکیج را جداگانه از Cursor می‌گیریم.
               </p>
               <div className="intake-project-summary">
                 <span className="icon-tile green">
@@ -358,34 +429,48 @@ export default function SetupPage({
                 </div>
                 <span className="badge green">تحلیل واقعی</span>
               </div>
-              <div className="recommended-stack">
-                <div>
-                  <span className="icon-tile green">
-                    <Rocket size={22} />
-                  </span>
+              <ProjectAdvicePanel
+                report={report}
+                loading={reviewing}
+                selected={packageId}
+                onSelect={setSelectedPackage}
+                onRetry={() => void reviewProject(report)}
+                demo={state.mode === "demo"}
+              />
+              <details className="intake-evidence">
+                <summary>جزئیات فنی شناخته‌شده از کد</summary>
+                <div className="recommended-stack">
                   <div>
-                    <strong>میزبانی {report.stack}</strong>
-                    <p>{report.resources}</p>
-                    <small>
-                      روش انتشار: {report.platform || "نیاز به تکمیل"} · پورت{" "}
-                      {fa(report.port)}
-                    </small>
-                  </div>
-                </div>
-                {report.services.map((s) => (
-                  <div key={s.name}>
-                    <span className="icon-tile gray">
-                      <Check size={21} />
+                    <span className="icon-tile green">
+                      <Rocket size={22} />
                     </span>
                     <div>
-                      <strong>{s.name}</strong>
-                      <p>{s.reason}</p>
+                      <strong>آنچه از فایل‌ها پیدا شد: {report.stack}</strong>
+                      <p>
+                        {report.runtime} · شروع برنامه:{" "}
+                        <bdi>{report.start || "نیاز به بررسی بیشتر"}</bdi>
+                      </p>
+                      <small>
+                        روش انتشار: {report.platform || "نیاز به تکمیل"} · پورت{" "}
+                        {fa(report.port)}
+                      </small>
                     </div>
-                    <span className="badge amber">بررسی اتصال</span>
                   </div>
-                ))}
-              </div>
-              {report.agentReview && (
+                  {report.services.map((s) => (
+                    <div key={s.name}>
+                      <span className="icon-tile gray">
+                        <Check size={21} />
+                      </span>
+                      <div>
+                        <strong>{s.name}</strong>
+                        <p>{s.reason}</p>
+                      </div>
+                      <span className="badge amber">بررسی اتصال</span>
+                    </div>
+                  ))}
+                </div>
+              </details>
+              {report.agentReview && !report.advice && (
                 <details
                   className="intake-review"
                   open={report.agentReview.length < 1000}
@@ -460,7 +545,12 @@ export default function SetupPage({
                 {canUpdate && (
                   <button
                     className="button primary"
-                    disabled={busy || !!report.blockers.length}
+                    disabled={
+                      busy ||
+                      reviewing ||
+                      !canContinue ||
+                      !!report.blockers.length
+                    }
                     onClick={() => void updateCurrent()}
                   >
                     {busy ? (
@@ -473,12 +563,19 @@ export default function SetupPage({
                 )}
                 <button
                   className={cn("button", canUpdate ? "secondary" : "primary")}
-                  disabled={busy || !!report.blockers.length}
+                  disabled={
+                    busy ||
+                    reviewing ||
+                    !canContinue ||
+                    !!report.blockers.length
+                  }
                   onClick={() => go(2)}
                 >
-                  {canUpdate
-                    ? "ساخت فروشگاه جداگانه"
-                    : "ادامه به تنظیمات و انتشار"}{" "}
+                  {!canContinue
+                    ? "ابتدا پیشنهاد کرسر را کامل کنید"
+                    : canUpdate
+                      ? "ساخت فروشگاه جداگانه"
+                      : "ادامه به تنظیمات و انتشار"}{" "}
                   <ArrowLeft size={17} />
                 </button>
                 <button className="text-button" onClick={() => go(0)}>
@@ -489,7 +586,12 @@ export default function SetupPage({
           )}
           {step === 2 && report && (
             <>
-              <ProvisionFlow state={state} report={report} />
+              <ProvisionFlow
+                key={report.id}
+                state={state}
+                report={report}
+                packageId={packageId}
+              />
               <button className="text-button wizard-back" onClick={() => go(1)}>
                 بازگشت به تحلیل پروژه
               </button>
@@ -502,44 +604,6 @@ export default function SetupPage({
           )}
         </div>
       </section>
-      <aside className="setup-aside">
-        <div className="panel">
-          <span className="agent-symbol">
-            <Flower2 size={25} />
-          </span>
-          <h3>یک پروژه، یک مسیر روشن.</h3>
-          <p>
-            لازم نیست از سرور بدانید. همراه فایل‌ها را می‌خواند، نیازها را توضیح
-            می‌دهد و پیش از تغییر از شما اجازه می‌گیرد.
-          </p>
-          <div className="intake-journey">
-            {[
-              "دریافت نسخهٔ مشخص از پروژه",
-              "تحلیل وابستگی‌ها و روش اجرا",
-              "پیشنهاد زیرساخت با شواهد",
-              "تأیید شما و بررسی نتیجه",
-            ].map((t, i) => (
-              <div key={t}>
-                <span>{fa(i + 1)}</span>
-                <p>{t}</p>
-              </div>
-            ))}
-          </div>
-          <div className="setup-assurance">
-            <ShieldCheck size={18} /> کنترل همیشه دست شماست.
-          </div>
-        </div>
-        <div className="panel domain-guide">
-          <Info size={23} />
-          <h3>چه چیزهایی بررسی می‌شوند؟</h3>
-          <p>
-            فریم‌ورک، وابستگی‌ها، Dockerfile، نام تنظیمات و نشانه‌های دیتابیس و
-            کش. تحلیل ایستا تضمین اجرای بی‌خطا نیست؛ نتیجه پس از انتشار سنجیده
-            می‌شود.
-          </p>
-          <p>در حالت دمو هم کد واقعی بررسی می‌شود؛ بدون نیاز به کلید API.</p>
-        </div>
-      </aside>
     </div>
   );
 }

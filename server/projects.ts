@@ -556,6 +556,7 @@ export class Projects {
       writeFileSync(path.join(dir, "manifest.json"), JSON.stringify(names));
       const result: ProjectReport = {
         ...report,
+        traffic: meta.traffic === "high" ? "high" : "low",
         id,
         name:
           meta.name.replace(/[^\p{L}\p{N} ._-]/gu, "").slice(0, 80) ||
