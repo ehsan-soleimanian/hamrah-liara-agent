@@ -5017,6 +5017,39 @@ td:last-child {
   gap: 14px;
   margin: 28px 0;
 }
+.intake-resume,
+.intake-result-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.intake-result-heading h2 {
+  margin-bottom: 0;
+}
+.intake-resume {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border, #34423d);
+}
+.intake-resume > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.intake-resume strong {
+  font-size: 14px;
+}
+.intake-resume span {
+  color: var(--text-muted, #a6b9af);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+.intake-resume .button,
+.intake-result-heading .button {
+  min-height: 44px;
+}
 .intake-source button {
   display: grid;
   grid-template-columns: 28px 1fr;

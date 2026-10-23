@@ -32,9 +32,9 @@ export default function SetupPage({
   const [traffic, setTraffic] = useState("low");
   const [file, setFile] = useState<File | null>(null);
   const [report, setReport] = useState<ProjectReport | null>(null);
+  const [savedProject, setSavedProject] = useState<ProjectReport | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [loaded, setLoaded] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const canUpdate = !!state.managedAppId && state.connections.writable;
   async function updateCurrent() {
@@ -51,21 +51,22 @@ export default function SetupPage({
   }
   useEffect(() => {
     let alive = true;
-    fetch("/api/projects/active")
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    // History is optional: it must never hide the form or advance the wizard.
+    fetch("/api/projects/active", { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : null))
       .then((p) => {
         if (alive && p) {
-          setReport(p);
-          setRoot(p.root === "." ? "" : p.root);
-          setStep(1);
+          setSavedProject((current) => current || p);
         }
       })
       .catch(() => {})
-      .finally(() => {
-        if (alive) setLoaded(true);
-      });
+      .finally(() => clearTimeout(timeout));
     return () => {
       alive = false;
+      clearTimeout(timeout);
+      controller.abort();
     };
   }, []);
   function go(next: number) {
@@ -106,6 +107,7 @@ export default function SetupPage({
         result = data;
       }
       setReport(result);
+      setSavedProject(result);
       go(1);
     } catch (e) {
       setError((e as Error).message);
@@ -142,170 +144,202 @@ export default function SetupPage({
                 لینک گیت‌هاب بدهید یا فایل پروژه را انتخاب کنید. همراه کد را
                 بررسی می‌کند و می‌گوید برای آنلاین‌شدن به چه چیزهایی نیاز دارید.
               </p>
-              {!loaded ? (
-                <p role="status">در حال بازیابی پروژهٔ قبلی…</p>
-              ) : (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    void analyze();
-                  }}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void analyze();
+                }}
+              >
+                <div
+                  className="intake-source"
+                  role="group"
+                  aria-label="روش دریافت پروژه"
                 >
-                  <div
-                    className="intake-source"
-                    role="group"
-                    aria-label="روش دریافت پروژه"
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className={cn(source === "github" && "selected")}
+                    aria-pressed={source === "github"}
+                    onClick={() => {
+                      setSource("github");
+                      setError("");
+                    }}
                   >
-                    <button
-                      type="button"
-                      disabled={busy}
-                      className={cn(source === "github" && "selected")}
-                      aria-pressed={source === "github"}
-                      onClick={() => {
-                        setSource("github");
-                        setError("");
-                      }}
+                    <Github size={22} />
+                    <strong>لینک گیت‌هاب</strong>
+                    <small>بدون دانلود دستی</small>
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    className={cn(source === "zip" && "selected")}
+                    aria-pressed={source === "zip"}
+                    onClick={() => {
+                      setSource("zip");
+                      setError("");
+                    }}
+                  >
+                    <FileArchive size={22} />
+                    <strong>فایل ZIP</strong>
+                    <small>از کامپیوتر شما</small>
+                  </button>
+                </div>
+                <fieldset disabled={busy} className="intake-fields">
+                  {source === "github" ? (
+                    <label htmlFor="project-url">
+                      آدرس مخزن گیت‌هاب
+                      <input
+                        id="project-url"
+                        type="url"
+                        dir="ltr"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        value={url}
+                        onChange={(e) => setUrl(e.target.value)}
+                        placeholder="https://github.com/you/your-project"
+                        required
+                        aria-describedby="repo-help intake-error"
+                      />
+                      <small id="repo-help">
+                        لینک مخزن عمومی گیت‌هاب را وارد کنید. برای پروژهٔ خصوصی،
+                        فایل ZIP را بارگذاری کنید.
+                      </small>
+                    </label>
+                  ) : (
+                    <label className="intake-upload" htmlFor="project-zip">
+                      <UploadCloud size={32} />
+                      <strong>
+                        {file?.name || "فایل پروژه را انتخاب کنید"}
+                      </strong>
+                      <span>
+                        ZIP تا ۲۰ مگابایت · بدون node_modules و فایل‌های کلید
+                      </span>
+                      <input
+                        id="project-zip"
+                        type="file"
+                        accept=".zip,application/zip"
+                        required
+                        onChange={(e) => setFile(e.target.files?.[0] || null)}
+                        aria-describedby="intake-error"
+                      />
+                    </label>
+                  )}
+                  <label htmlFor="project-traffic">
+                    در شروع چقدر بازدید دارید؟
+                    <select
+                      id="project-traffic"
+                      value={traffic}
+                      onChange={(e) => setTraffic(e.target.value)}
                     >
-                      <Github size={22} />
-                      <strong>لینک گیت‌هاب</strong>
-                      <small>بدون دانلود دستی</small>
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      className={cn(source === "zip" && "selected")}
-                      aria-pressed={source === "zip"}
-                      onClick={() => {
-                        setSource("zip");
-                        setError("");
-                      }}
-                    >
-                      <FileArchive size={22} />
-                      <strong>فایل ZIP</strong>
-                      <small>از کامپیوتر شما</small>
-                    </button>
-                  </div>
-                  <fieldset disabled={busy} className="intake-fields">
-                    {source === "github" ? (
-                      <label htmlFor="project-url">
-                        آدرس مخزن گیت‌هاب
+                      <option value="low">
+                        تازه شروع می‌کنم یا بازدید کمی دارم
+                      </option>
+                      <option value="high">
+                        کاربر فعال زیاد دارم یا انتظار رشد سریع دارم
+                      </option>
+                    </select>
+                  </label>
+                  <details className="intake-advanced">
+                    <summary>تنظیمات اختیاری پروژه</summary>
+                    <p>
+                      اگر برنامه در پوشه‌ای داخل مخزن قرار دارد، نام آن را وارد
+                      کنید.
+                    </p>
+                    <label htmlFor="project-root">
+                      پوشهٔ برنامه
+                      <input
+                        id="project-root"
+                        dir="ltr"
+                        placeholder="apps/web"
+                        value={root}
+                        onChange={(e) => setRoot(e.target.value)}
+                      />
+                    </label>
+                    {source === "github" && (
+                      <label htmlFor="project-ref">
+                        شاخه، تگ یا نسخه
                         <input
-                          id="project-url"
-                          type="url"
+                          id="project-ref"
                           dir="ltr"
-                          value={url}
-                          onChange={(e) => setUrl(e.target.value)}
-                          placeholder="https://github.com/you/your-project"
-                          required
-                          aria-describedby="repo-help intake-error"
-                        />
-                        <small id="repo-help">
-                          برای مخزن خصوصی، ZIP آپلود کنید یا GITHUB_TOKEN را در
-                          تنظیمات سرور بگذارید.
-                        </small>
-                      </label>
-                    ) : (
-                      <label className="intake-upload" htmlFor="project-zip">
-                        <UploadCloud size={32} />
-                        <strong>
-                          {file?.name || "فایل پروژه را انتخاب کنید"}
-                        </strong>
-                        <span>
-                          ZIP تا ۲۰ مگابایت · بدون node_modules و فایل‌های کلید
-                        </span>
-                        <input
-                          id="project-zip"
-                          type="file"
-                          accept=".zip,application/zip"
-                          required
-                          onChange={(e) => setFile(e.target.files?.[0] || null)}
-                          aria-describedby="intake-error"
+                          placeholder="پیش‌فرض مخزن"
+                          value={ref}
+                          onChange={(e) => setRef(e.target.value)}
                         />
                       </label>
                     )}
-                    <label htmlFor="project-traffic">
-                      در شروع چقدر بازدید دارید؟
-                      <select
-                        id="project-traffic"
-                        value={traffic}
-                        onChange={(e) => setTraffic(e.target.value)}
-                      >
-                        <option value="low">
-                          تازه شروع می‌کنم یا بازدید کمی دارم
-                        </option>
-                        <option value="high">
-                          کاربر فعال زیاد دارم یا انتظار رشد سریع دارم
-                        </option>
-                      </select>
-                    </label>
-                    <details className="intake-advanced">
-                      <summary>تنظیمات اختیاری پروژه</summary>
-                      <p>
-                        اگر برنامه در پوشه‌ای داخل مخزن قرار دارد، نام آن را
-                        وارد کنید.
-                      </p>
-                      <label htmlFor="project-root">
-                        پوشهٔ برنامه
-                        <input
-                          id="project-root"
-                          dir="ltr"
-                          placeholder="apps/web"
-                          value={root}
-                          onChange={(e) => setRoot(e.target.value)}
-                        />
-                      </label>
-                      {source === "github" && (
-                        <label htmlFor="project-ref">
-                          شاخه، تگ یا نسخه
-                          <input
-                            id="project-ref"
-                            dir="ltr"
-                            placeholder="پیش‌فرض مخزن"
-                            value={ref}
-                            onChange={(e) => setRef(e.target.value)}
-                          />
-                        </label>
-                      )}
-                    </details>
-                  </fieldset>
-                  <div className="notice-banner">
-                    <ShieldCheck size={18} />
-                    <span>
-                      برای تحلیل، کد اجرا نمی‌شود. فایل‌های env و کلیدهای
-                      شناخته‌شده از انتشار حذف می‌شوند. تنها پروژه‌ای را منتشر
-                      کنید که به کدش اعتماد دارید.
-                    </span>
+                  </details>
+                </fieldset>
+                <div className="notice-banner">
+                  <ShieldCheck size={18} />
+                  <span>
+                    برای تحلیل، کد اجرا نمی‌شود. فایل‌های env و کلیدهای
+                    شناخته‌شده از انتشار حذف می‌شوند. تنها پروژه‌ای را منتشر
+                    کنید که به کدش اعتماد دارید.
+                  </span>
+                </div>
+                <button
+                  className="button primary"
+                  type="submit"
+                  disabled={busy}
+                >
+                  {busy ? (
+                    <LoaderCircle className="spin" size={17} />
+                  ) : (
+                    <ArrowLeft size={17} />
+                  )}{" "}
+                  {busy
+                    ? "در حال دریافت و بررسی پروژه…"
+                    : "پروژه‌ام را بررسی کن"}
+                </button>
+                {busy && (
+                  <p role="status">
+                    دریافت سورس، بررسی وابستگی‌ها و آماده‌سازی پیشنهاد؛ ممکن است
+                    یک دقیقه طول بکشد.
+                  </p>
+                )}
+              </form>
+              {savedProject && (
+                <aside className="intake-resume" aria-label="پروژهٔ قبلی">
+                  <div>
+                    <strong>می‌خواهید پروژهٔ قبلی را ادامه دهید؟</strong>
+                    <span dir="auto">{savedProject.name}</span>
                   </div>
                   <button
-                    className="button primary"
-                    type="submit"
+                    type="button"
+                    className="button secondary"
                     disabled={busy}
+                    onClick={() => {
+                      setReport(savedProject);
+                      go(1);
+                    }}
                   >
-                    {busy ? (
-                      <LoaderCircle className="spin" size={17} />
-                    ) : (
-                      <ArrowLeft size={17} />
-                    )}{" "}
-                    {busy
-                      ? "در حال دریافت و بررسی پروژه…"
-                      : "پروژه‌ام را بررسی کن"}
+                    ادامهٔ پروژهٔ قبلی
+                    <ArrowLeft size={16} />
                   </button>
-                  {busy && (
-                    <p role="status">
-                      دریافت سورس، بررسی وابستگی‌ها و آماده‌سازی پیشنهاد؛ ممکن
-                      است یک دقیقه طول بکشد.
-                    </p>
-                  )}
-                </form>
+                </aside>
               )}
             </>
           )}
           {step === 1 && report && (
             <>
-              <span className="eyebrow">پیشنهاد بر اساس فایل‌های واقعی</span>
-              <h2 ref={heading} tabIndex={-1}>
-                پروژه‌تان را شناختیم.
-              </h2>
+              <div className="intake-result-heading">
+                <div>
+                  <span className="eyebrow">
+                    پیشنهاد بر اساس فایل‌های واقعی
+                  </span>
+                  <h2 ref={heading} tabIndex={-1}>
+                    پروژه‌تان را شناختیم.
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  className="button secondary"
+                  disabled={busy}
+                  onClick={() => go(0)}
+                >
+                  واردکردن پروژهٔ جدید
+                </button>
+              </div>
               <p>
                 برای «{report.name}» این مسیر را پیشنهاد می‌کنم. میزان دقیق
                 منابع پس از اجرا مشخص می‌شود.
